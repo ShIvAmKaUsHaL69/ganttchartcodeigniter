@@ -75,7 +75,6 @@ $totalRangeDays = $overallEnd->diff($overallStart)->days + 1;
 .gantt-row {
     display: flex;
     align-items: center;
-    margin-bottom: 15px; /* Vertical spacing between tasks */
     min-height: 50px;
     border-bottom: 1px dashed #eee;
     padding-bottom: 10px;
@@ -84,6 +83,7 @@ $totalRangeDays = $overallEnd->diff($overallStart)->days + 1;
     display: flex;
     flex: 0 0 600px; /* Wider to accommodate columns */
     padding-right: 15px;
+    font-size: 14px;
 }
 .task-column {
     padding: 0 10px;
@@ -152,7 +152,7 @@ $totalRangeDays = $overallEnd->diff($overallStart)->days + 1;
             <div class="task-column task-duration">Duration</div>
             <div class="task-column task-dates">Start Date</div>
             <div class="task-column task-dates">End Date</div>
-            <div class="task-column task-progress">Progress</div>
+            <div class="task-column task-progress">Expected <br>Progress</div>
         </div>
         <?php foreach ($weeks as $weekStartStr): ?>
             <div class="gantt-week-header">

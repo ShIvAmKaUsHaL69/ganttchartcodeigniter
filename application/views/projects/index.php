@@ -22,6 +22,10 @@
             <td>
                 <a href="<?= site_url('projects/edit/'.$proj->id); ?>" class="btn btn-sm btn-warning">Edit</a>
                 <a href="<?= site_url('projects/delete/'.$proj->id); ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this project?')">Delete</a>
+                <a href="<?= site_url('projects/tasks/'.$proj->id); ?>" class="btn btn-sm btn-success">View Task</a>
+                <a href="<?= site_url('projects/add_task/'.$proj->id); ?>" class="btn btn-sm btn-secondary">Add Task</a>
+                <a href="<?= site_url('projects/gantt/'.$proj->id); ?>" class="btn btn-sm btn-info">View Gantt Chart</a>
+                
             </td>
         </tr>
     <?php endforeach; ?>

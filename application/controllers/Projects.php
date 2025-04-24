@@ -6,6 +6,8 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * @property Task_model $task
  * @property CI_Input $input
  * @property CI_Form_validation $form_validation
+ * @property CI_Upload $upload
+ * @property CI_Session $session
  */
 class Projects extends CI_Controller
 {
@@ -14,6 +16,8 @@ class Projects extends CI_Controller
         parent::__construct();
         $this->load->model('Project_model', 'project');
         $this->load->model('Task_model', 'task');
+        $this->load->library('upload');
+        $this->load->library('session');
     }
 
     public function index()
@@ -129,5 +133,172 @@ class Projects extends CI_Controller
         if(!$data['project']) show_404();
         $data['tasks'] = $this->task->get_all($project_id);
         $this->load->view('tasks/gantt', $data);
+    }
+
+    /**
+     * Download a template Excel file for bulk task uploads
+     */
+    public function download_task_template()
+    {
+        // Load PhpSpreadsheet library
+        require_once FCPATH . 'vendor/autoload.php';
+        
+        // Create new Spreadsheet object
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        
+        // Add headings to the first row
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setCellValue('A1', 'Task Name');
+        $sheet->setCellValue('B1', 'Assigned To');
+        $sheet->setCellValue('C1', 'Start Date (DD-MM-YYYY)');
+        $sheet->setCellValue('D1', 'End Date (DD-MM-YYYY)');
+        $sheet->setCellValue('E1', 'Progress (%)');
+        
+        // Make the heading row bold
+        $sheet->getStyle('A1:E1')->getFont()->setBold(true);
+        
+        // Auto-size columns
+        foreach(range('A', 'E') as $column) {
+            $sheet->getColumnDimension($column)->setAutoSize(true);
+        }
+        
+        // Create a sample data row
+        $sheet->setCellValue('A2', 'Sample Task');
+        $sheet->setCellValue('B2', 'John Doe');
+        $sheet->setCellValue('C2', date('d-m-Y'));
+        $sheet->setCellValue('D2', date('d-m-Y', strtotime('+1 week')));
+        $sheet->setCellValue('E2', '0');
+        
+        // Set content-type and filename
+        $filename = 'tasks_template.xlsx';
+        
+        // Redirect output to client browser
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    }
+    
+    /**
+     * Handle bulk upload of tasks from Excel file
+     */
+    public function bulk_upload_tasks($project_id)
+    {
+        $data['project'] = $this->project->get($project_id);
+        if (!$data['project']) show_404();
+        
+        // Check if a file has been uploaded
+        if (empty($_FILES['excel_file']['name'])) {
+            $data['excel_error'] = 'Please select a file to upload';
+            $this->load->view('tasks/create', $data);
+            return;
+        }
+        
+        // Set upload configuration
+        $config['upload_path'] = './uploads/';
+        $config['allowed_types'] = 'xlsx|xls|csv';
+        $config['max_size'] = 2048; // 2MB max
+        
+        // Create directory if it doesn't exist
+        if (!file_exists($config['upload_path'])) {
+            mkdir($config['upload_path'], 0777, true);
+        }
+        
+        $this->upload->initialize($config);
+        
+        // Attempt to upload the file
+        if (!$this->upload->do_upload('excel_file')) {
+            $data['excel_error'] = $this->upload->display_errors('', '');
+            $this->load->view('tasks/create', $data);
+            return;
+        }
+        
+        // Get the uploaded file info
+        $file_data = $this->upload->data();
+        $file_path = './uploads/' . $file_data['file_name'];
+        
+        // Load PhpSpreadsheet library
+        require_once FCPATH . 'vendor/autoload.php';
+        
+        try {
+            // Load the spreadsheet
+            $inputFileType = \PhpOffice\PhpSpreadsheet\IOFactory::identify($file_path);
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader($inputFileType);
+            $spreadsheet = $reader->load($file_path);
+            
+            // Get the first worksheet
+            $worksheet = $spreadsheet->getActiveSheet();
+            $highestRow = $worksheet->getHighestRow();
+            
+            // Skip the header row
+            $tasks_added = 0;
+            $tasks_skipped = 0;
+            
+            for ($row = 2; $row <= $highestRow; $row++) {
+                $task_name = $worksheet->getCellByColumnAndRow(1, $row)->getValue();
+                $assigned_to = $worksheet->getCellByColumnAndRow(2, $row)->getValue();
+                $start_date = $worksheet->getCellByColumnAndRow(3, $row)->getValue();
+                $end_date = $worksheet->getCellByColumnAndRow(4, $row)->getValue();
+                $progress = $worksheet->getCellByColumnAndRow(5, $row)->getValue();
+                
+                // Skip empty rows
+                if (empty($task_name)) {
+                    continue;
+                }
+                
+                // Format dates if they are Excel date values
+                if (is_numeric($start_date)) {
+                    $start_date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($start_date)->format('Y-m-d');
+                }
+                
+                if (is_numeric($end_date)) {
+                    $end_date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($end_date)->format('Y-m-d');
+                }
+                
+                // Validate data
+                if (empty($task_name) || empty($start_date) || empty($end_date)) {
+                    $tasks_skipped++;
+                    continue;
+                }
+                
+                // Set progress to 0 if not provided
+                $progress = empty($progress) ? 0 : (int)$progress;
+                
+                // Prepare task data
+                $payload = [
+                    'project_id' => $project_id,
+                    'task_name'  => $task_name,
+                    'assigned_to'=> $assigned_to,
+                    'start_date' => $start_date,
+                    'end_date'   => $end_date,
+                    'progress'   => $progress
+                ];
+                
+                // Insert the task
+                $this->task->create($payload);
+                $tasks_added++;
+            }
+            
+            // Delete the uploaded file
+            
+            // Set success message
+            $this->session->set_flashdata('success', "Imported $tasks_added tasks successfully. Skipped $tasks_skipped tasks.");
+            
+            // Redirect to tasks list
+            redirect('projects/tasks/' . $project_id);
+            
+        } catch (Exception $e) {
+            // Delete the uploaded file if it exists
+            if (file_exists($file_path)) {
+                unlink($file_path);
+            }
+            
+            $data['excel_error'] = 'Error processing Excel file: ' . $e->getMessage();
+            $this->load->view('tasks/create', $data);
+            return;
+        }
     }
 } 

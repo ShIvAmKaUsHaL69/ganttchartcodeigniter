@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-    <a class="navbar-brand" href="<?= site_url('projects'); ?>">Gantt Chart Tool</a>
-</nav>
-<div class="container-fluid mt-4 p-5"> 
+<!--<nav class="navbar navbar-expand-lg navbar-light bg-light">-->
+<!--    <a class="navbar-brand" href="<?= site_url('projects'); ?>"></a>-->
+<!--</nav>-->
+<div class="container-fluid mt-4 px-5"> 
