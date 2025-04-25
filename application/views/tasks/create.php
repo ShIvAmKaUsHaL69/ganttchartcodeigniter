@@ -13,39 +13,57 @@
 <div class="tab-content" id="taskTabsContent">
   <div class="tab-pane fade show active" id="singleTask" role="tabpanel">
     <form method="post">
-        <div class="form-group">
-            <label for="task_name">Task Name</label>
-            <input type="text" name="task_name" id="task_name" class="form-control" value="<?= set_value('task_name'); ?>">
-            <?= form_error('task_name', '<small class="text-danger">', '</small>'); ?>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="task_name">Task Name</label>
+                    <input type="text" name="task_name" id="task_name" class="form-control" value="<?= set_value('task_name'); ?>">
+                    <?= form_error('task_name', '<small class="text-danger">', '</small>'); ?>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="assigned_to">Assigned To</label>
+                    <input type="text" name="assigned_to" id="assigned_to" class="form-control" value="<?= set_value('assigned_to'); ?>">
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="start_date">Start Date</label>
+                    <input type="date" name="start_date" id="start_date" class="form-control" value="<?= set_value('start_date'); ?>">
+                    <?= form_error('start_date', '<small class="text-danger">', '</small>'); ?>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="end_date">End Date</label>
+                    <input type="date" name="end_date" id="end_date" class="form-control" value="<?= set_value('end_date'); ?>">
+                    <?= form_error('end_date', '<small class="text-danger">', '</small>'); ?>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="progress">Progress (%)</label>
+                    <input type="number" name="progress" id="progress" class="form-control" value="<?= set_value('progress', 0); ?>" min="0" max="100">
+                    <?= form_error('progress', '<small class="text-danger">', '</small>'); ?>
+                </div>
+            </div>
         </div>
         <div class="form-group">
-            <label for="assigned_to">Assigned To</label>
-            <input type="text" name="assigned_to" id="assigned_to" class="form-control" value="<?= set_value('assigned_to'); ?>">
+            <button class="btn btn-primary">Save</button>
+            <a href="<?= site_url('projects/tasks/'.$project->id); ?>" class="btn btn-secondary">Cancel</a>
         </div>
-        <div class="form-group">
-            <label for="start_date">Start Date</label>
-            <input type="date" name="start_date" id="start_date" class="form-control" value="<?= set_value('start_date'); ?>">
-            <?= form_error('start_date', '<small class="text-danger">', '</small>'); ?>
-        </div>
-        <div class="form-group">
-            <label for="end_date">End Date</label>
-            <input type="date" name="end_date" id="end_date" class="form-control" value="<?= set_value('end_date'); ?>">
-            <?= form_error('end_date', '<small class="text-danger">', '</small>'); ?>
-        </div>
-        <div class="form-group">
-            <label for="progress">Progress (%)</label>
-            <input type="number" name="progress" id="progress" class="form-control" value="<?= set_value('progress', 0); ?>" min="0" max="100">
-            <?= form_error('progress', '<small class="text-danger">', '</small>'); ?>
-        </div>
-        <button class="btn btn-primary">Save</button>
-        <a href="<?= site_url('projects/tasks/'.$project->id); ?>" class="btn btn-secondary">Cancel</a>
     </form>
   </div>
   
   <div class="tab-pane fade" id="bulkUpload" role="tabpanel">
     <form method="post" enctype="multipart/form-data" action="<?= site_url('projects/bulk_upload_tasks/'.$project->id); ?>">
         <div class="form-group">
-            <a href="<?= site_url('projects/download_task_template'); ?>" class="btn btn-info btn-sm">
+            <a href="<?= site_url('projects/download_task_template'); ?>" class="btn btn-info">
                 <i class="fa fa-download"></i> Download Sample Excel
             </a>
         </div>
@@ -57,8 +75,10 @@
                 <small class="text-danger"><?= $excel_error; ?></small>
             <?php endif; ?>
         </div>
-        <button class="btn btn-primary">Upload and Save Tasks</button>
-        <a href="<?= site_url('projects/tasks/'.$project->id); ?>" class="btn btn-secondary">Cancel</a>
+        <div class="form-group">
+            <button class="btn btn-primary">Upload and Save Tasks</button>
+            <a href="<?= site_url('projects/tasks/'.$project->id); ?>" class="btn btn-secondary">Cancel</a>
+        </div>
     </form>
   </div>
 </div>

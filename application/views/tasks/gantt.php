@@ -1,6 +1,14 @@
 <?php $this->load->view('layout/header'); ?>
-<h3>Gantt Chart – <?= htmlspecialchars($project->name, ENT_QUOTES, 'UTF-8'); ?></h3>
-<a href="<?= site_url('projects/tasks/'.$project->id); ?>" class="btn btn-secondary mb-3">Back to Tasks</a>
+<!-- Add required libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3>Gantt Chart – <?= htmlspecialchars($project->name, ENT_QUOTES, 'UTF-8'); ?></h3>
+        <a href="<?= site_url('projects/tasks/'.$project->id); ?>" class="btn btn-secondary">Back to Tasks</a>
+    </div>
+    <button id="exportPdf" class="btn btn-primary"><i class="fas fa-file-pdf"></i> Export as PDF</button>
+</div>
 
 <?php
 if (!count($tasks)) {
@@ -8,6 +16,17 @@ if (!count($tasks)) {
     $this->load->view('layout/footer');
     return;
 }
+
+// Calculate max task name length for dynamic column width
+$maxTaskNameLength = 0;
+foreach ($tasks as $t) {
+    $taskNameLength = strlen($t->task_name);
+    if ($taskNameLength > $maxTaskNameLength) {
+        $maxTaskNameLength = $taskNameLength;
+    }
+}
+// Set min width 150px, and add ~10px per character beyond 15 chars
+$taskNameWidth = max(150, 150 + ($maxTaskNameLength - 15) * 8);
 
 // Determine date range across all tasks
 $minDateStr = null;
@@ -47,6 +66,9 @@ $weekWidthPercent = ($totalWeeks > 0) ? 100 / $totalWeeks : 0;
 // Total days in the *displayed* range for accurate percentage calculation
 $totalRangeDays = $overallEnd->diff($overallStart)->days + 1;
 
+// Calculate task info width based on task name width
+$taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
+
 ?>
 
 <style>
@@ -81,7 +103,7 @@ $totalRangeDays = $overallEnd->diff($overallStart)->days + 1;
 }
 .gantt-task-info {
     display: flex;
-    flex: 0 0 600px; /* Wider to accommodate columns */
+    flex: 0 0 <?= $taskInfoWidth ?>px; /* Dynamic width based on task name */
     padding-right: 15px;
     font-size: 14px;
 }
@@ -93,7 +115,7 @@ $totalRangeDays = $overallEnd->diff($overallStart)->days + 1;
     text-overflow: ellipsis;
 }
 .task-name {
-    width: 150px;
+    width: <?= $taskNameWidth ?>px; /* Dynamic width */
     font-weight: bold;
 }
 .task-assignee {
@@ -143,13 +165,13 @@ $totalRangeDays = $overallEnd->diff($overallStart)->days + 1;
 }
 </style>
 
-<div class="gantt-container">
+<div id="ganttChart" class="gantt-container">
     <!-- Header Row -->
     <div class="gantt-header">
-        <div style="flex: 0 0 600px; padding-right: 15px; display: flex;">
+        <div style="flex: 0 0 <?= $taskInfoWidth ?>px; padding-right: 15px; display: flex;">
             <div class="task-column task-name">Task</div>
             <div class="task-column task-assignee">Assignee</div>
-            <div class="task-column task-duration">Duration</div>
+            <div class="task-column task-duration">Duration (Days)</div>
             <div class="task-column task-dates">Start Date</div>
             <div class="task-column task-dates">End Date</div>
             <div class="task-column task-progress">Expected <br>Progress</div>
@@ -186,9 +208,9 @@ $totalRangeDays = $overallEnd->diff($overallStart)->days + 1;
     ?>
         <div class="gantt-row">
             <div class="gantt-task-info">
-                <div class="task-column task-name"><?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?></div>
+                <div class="task-column task-name" title="<?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?>"><?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?></div>
                 <div class="task-column task-assignee"><?= htmlspecialchars($t->assigned_to ?: 'N/A', ENT_QUOTES, 'UTF-8'); ?></div>
-                <div class="task-column task-duration"><?= $originalDurationDays ?> day(s)</div>
+                <div class="task-column task-duration"><?= $originalDurationDays ?></div>
                 <div class="task-column task-dates"><?= $t->start_date ?></div>
                 <div class="task-column task-dates"><?= $t->end_date ?></div>
                 <div class="task-column task-progress"><?= $t->progress ?>%</div>
@@ -201,5 +223,87 @@ $totalRangeDays = $overallEnd->diff($overallStart)->days + 1;
         </div>
     <?php endforeach; ?>
 </div>
+
+<script>
+document.getElementById('exportPdf').addEventListener('click', function() {
+    // Get the chart element
+    var element = document.getElementById('ganttChart');
+    var projectName = "<?= htmlspecialchars($project->name, ENT_QUOTES, 'UTF-8'); ?>";
+    
+    // Calculate full chart dimensions
+    var requiredWidth = element.scrollWidth;
+    var requiredHeight = element.scrollHeight;
+    
+    // Create a temporary div for the chart copy
+    var tempDiv = document.createElement('div');
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.left = '0';
+    tempDiv.style.top = '0';
+    tempDiv.style.visibility = 'hidden';
+    tempDiv.style.width = requiredWidth + 'px';
+    tempDiv.style.height = requiredHeight + 'px';
+    document.body.appendChild(tempDiv);
+    
+    // Clone the gantt chart
+    var clone = element.cloneNode(true);
+    
+    // Force the chart to the full dimensions
+    clone.style.width = requiredWidth + 'px';
+    clone.style.height = requiredHeight + 'px';
+    clone.style.maxWidth = 'none';
+    clone.style.overflow = 'visible';
+    clone.style.margin = '0';
+    clone.style.padding = '0';
+    
+    // Force the header to be full width
+    var headerEl = clone.querySelector('.gantt-header');
+    if (headerEl) {
+        headerEl.style.width = requiredWidth + 'px';
+        headerEl.style.minWidth = requiredWidth + 'px';
+    }
+    
+    // Force all timeline elements to be wide enough
+    var timelineElements = clone.querySelectorAll('.gantt-timeline');
+    timelineElements.forEach(function(el) {
+        el.style.minWidth = requiredWidth + 'px';
+        el.style.width = requiredWidth + 'px';
+    });
+    
+    // Add the clone to the temp div
+    tempDiv.appendChild(clone);
+    
+    // Configure html2pdf options
+    var opt = {
+        margin: 15,
+        filename: 'Gantt_Chart_' + projectName.replace(/\s+/g, '_') + '.pdf',
+        image: { type: 'jpeg', quality: 1.0 },
+        html2canvas: {
+            scale: 1,
+            useCORS: true,
+            width: requiredWidth,
+            height: requiredHeight,
+            x: 0,
+            y: 0,
+            letterRendering: true,
+            allowTaint: true,
+            logging: true
+        },
+        jsPDF: {
+            unit: 'px',
+            format: [requiredWidth + 20, requiredHeight + 20],
+            orientation: 'landscape'
+        }
+    };
+    
+    // Generate and save the PDF
+    html2pdf().from(clone).set(opt).save().then(function() {
+        // Clean up
+        document.body.removeChild(tempDiv);
+    }).catch(function(error) {
+        console.error('Error generating PDF:', error);
+        alert('Error generating PDF. Please try again.');
+    });
+});
+</script>
 
 <?php $this->load->view('layout/footer'); ?> 
