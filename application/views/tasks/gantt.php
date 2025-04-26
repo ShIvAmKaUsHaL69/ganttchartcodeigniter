@@ -1,13 +1,56 @@
 <?php $this->load->view('layout/header'); ?>
 <!-- Add required libraries -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #ganttChart, #ganttChart * {
+        visibility: visible;
+    }
+    #ganttChart {
+        position: absolute;
+        left: 0;
+        top: 0;
+        transform-origin: top left;
+        width: 100%;
+        max-width: none !important;
+        overflow: visible !important;
+    }
+    .gantt-container {
+        overflow: visible !important;
+        width: 100% !important;
+        max-width: none !important;
+    }
+    .gantt-header, .gantt-row {
+        width: 100% !important;
+        max-width: none !important;
+    }
+    .gantt-timeline {
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+    .no-print {
+        display: none !important;
+    }
+    .print-title {
+        display: block !important;
+        text-align: start;
+        margin-bottom: 20px;
+    }
+    @page {
+        size: landscape;
+        margin: 1cm;
+    }
+}
+</style>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
         <h3>Gantt Chart – <?= htmlspecialchars($project->name, ENT_QUOTES, 'UTF-8'); ?></h3>
-        <a href="<?= site_url('projects/tasks/'.$project->id); ?>" class="btn btn-secondary">Back to Tasks</a>
+        <a href="<?= site_url('projects/tasks/'.$project->id); ?>" class="btn btn-secondary no-print">Back to Tasks</a>
     </div>
-    <button id="exportPdf" class="btn btn-primary"><i class="fas fa-file-pdf"></i> Export as PDF</button>
+    <button id="exportPdf" class="btn btn-primary no-print"><i class="fas fa-file-pdf"></i> Export as PDF</button>
 </div>
 
 <?php
@@ -75,13 +118,10 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
 .gantt-container {
     position: relative;
     overflow-x: auto;
-    border: 1px solid #ccc;
     padding: 10px;
-    background-color: #f9f9f9;
 }
 .gantt-header {
     display: flex;
-    border-bottom: 1px solid #ccc;
     padding-bottom: 5px;
     margin-bottom: 10px;
     font-size: 10px;
@@ -142,7 +182,7 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
         #eee calc(<?= $weekWidthPercent ?>% - 1px),
         #eee <?= $weekWidthPercent ?>%
     );
-    min-width: <?= $totalWeeks * 70 ?>px; /* Estimate min width */
+    min-width: 100%; /* Estimate min width */
     border: 1px solid #0000004f;
     border-radius: 5px;
 }
@@ -166,9 +206,12 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
 </style>
 
 <div id="ganttChart" class="gantt-container">
+    <div class="print-title" style="display: none;">
+        <h2><?= htmlspecialchars($project->name, ENT_QUOTES, 'UTF-8'); ?></h2>
+    </div>
     <!-- Header Row -->
     <div class="gantt-header">
-        <div style="flex: 0 0 <?= $taskInfoWidth ?>px; padding-right: 15px; display: flex;">
+        <div style="flex: 0 0 <?= $taskInfoWidth ?>px; padding-right: 15px; display: flex;" class='gantt-header-row'>
             <div class="task-column task-name">Task</div>
             <div class="task-column task-assignee">Assignee</div>
             <div class="task-column task-duration">Duration (Days)</div>
@@ -216,7 +259,9 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
                 <div class="task-column task-progress"><?= $t->progress ?>%</div>
             </div>
             <div class="gantt-timeline">
-                <div class="gantt-bar" style="left: <?= $barLeftPercent ?>%; width: <?= $barWidthPercent ?>%;">
+                <div class="gantt-bar" 
+                     style="left: <?= $barLeftPercent ?>%; width: <?= $barWidthPercent ?>%;"
+                     title="Task: <?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?> &#10;Assignee: <?= htmlspecialchars($t->assigned_to ?: 'N/A', ENT_QUOTES, 'UTF-8'); ?> &#10;Start Date: <?= $t->start_date ?> &#10;End Date: <?= $t->end_date ?> &#10;Progress: <?= $t->progress ?>% &#10;Duration: <?= $taskDurationDays ?> days">
                     <div class="gantt-progress" style="width: <?= $t->progress ?>%;"></div>
                 </div>
             </div>
@@ -226,83 +271,40 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
 
 <script>
 document.getElementById('exportPdf').addEventListener('click', function() {
-    // Get the chart element
-    var element = document.getElementById('ganttChart');
-    var projectName = "<?= htmlspecialchars($project->name, ENT_QUOTES, 'UTF-8'); ?>";
+    // Prepare chart for printing
+    var ganttChart = document.getElementById('ganttChart');
+    var fullWidth = ganttChart.scrollWidth;
     
-    // Calculate full chart dimensions
-    var requiredWidth = element.scrollWidth;
-    var requiredHeight = element.scrollHeight;
+    // Store original styles to restore after printing
+    var originalOverflow = ganttChart.style.overflow;
+    var originalWidth = ganttChart.style.width;
+    var originalTransform = ganttChart.style.transform;
     
-    // Create a temporary div for the chart copy
-    var tempDiv = document.createElement('div');
-    tempDiv.style.position = 'absolute';
-    tempDiv.style.left = '0';
-    tempDiv.style.top = '0';
-    tempDiv.style.visibility = 'hidden';
-    tempDiv.style.width = requiredWidth + 'px';
-    tempDiv.style.height = requiredHeight + 'px';
-    document.body.appendChild(tempDiv);
+    // Set explicit width for printing
+    ganttChart.style.overflow = 'visible';
+    ganttChart.style.width = fullWidth + 'px';
     
-    // Clone the gantt chart
-    var clone = element.cloneNode(true);
+    // Calculate scale factor to fit the chart on the page
+    // A typical landscape A4 page is around 1123px wide in most browsers' print preview
+    var targetWidth = 1700; // Standard for most print layouts in landscape
+    var scaleRatio = 1;
     
-    // Force the chart to the full dimensions
-    clone.style.width = requiredWidth + 'px';
-    clone.style.height = requiredHeight + 'px';
-    clone.style.maxWidth = 'none';
-    clone.style.overflow = 'visible';
-    clone.style.margin = '0';
-    clone.style.padding = '0';
-    
-    // Force the header to be full width
-    var headerEl = clone.querySelector('.gantt-header');
-    if (headerEl) {
-        headerEl.style.width = requiredWidth + 'px';
-        headerEl.style.minWidth = requiredWidth + 'px';
+    if (fullWidth > targetWidth) {
+        scaleRatio = targetWidth / fullWidth;
+        ganttChart.style.transform = 'scale(' + scaleRatio + ')';
     }
     
-    // Force all timeline elements to be wide enough
-    var timelineElements = clone.querySelectorAll('.gantt-timeline');
-    timelineElements.forEach(function(el) {
-        el.style.minWidth = requiredWidth + 'px';
-        el.style.width = requiredWidth + 'px';
-    });
-    
-    // Add the clone to the temp div
-    tempDiv.appendChild(clone);
-    
-    // Configure html2pdf options
-    var opt = {
-        margin: 15,
-        filename: 'Gantt_Chart_' + projectName.replace(/\s+/g, '_') + '.pdf',
-        image: { type: 'jpeg', quality: 1.0 },
-        html2canvas: {
-            scale: 1,
-            useCORS: true,
-            width: requiredWidth,
-            height: requiredHeight,
-            x: 0,
-            y: 0,
-            letterRendering: true,
-            allowTaint: true,
-            logging: true
-        },
-        jsPDF: {
-            unit: 'px',
-            format: [requiredWidth + 20, requiredHeight + 20],
-            orientation: 'landscape'
-        }
-    };
-    
-    // Generate and save the PDF
-    html2pdf().from(clone).set(opt).save().then(function() {
-        // Clean up
-        document.body.removeChild(tempDiv);
-    }).catch(function(error) {
-        console.error('Error generating PDF:', error);
-        alert('Error generating PDF. Please try again.');
-    });
+    // Use timeout to allow browser to apply the style changes
+    setTimeout(function() {
+        window.print();
+        
+        // Restore original styles after printing
+        setTimeout(function() {
+            ganttChart.style.overflow = originalOverflow;
+            ganttChart.style.width = originalWidth;
+            ganttChart.style.transform = originalTransform;
+        }, 500);
+    }, 100);
 });
 </script>
 
