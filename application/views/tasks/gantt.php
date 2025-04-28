@@ -7,6 +7,9 @@
     }
     #ganttChart, #ganttChart * {
         visibility: visible;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+        color-adjust: exact;
     }
     #ganttChart {
         position: absolute;
@@ -19,16 +22,16 @@
     }
     .gantt-container {
         overflow: visible !important;
-        width: 100% !important;
+        width: auto !important;
         max-width: none !important;
     }
     .gantt-header, .gantt-row {
-        width: 100% !important;
+        width: auto !important;
         max-width: none !important;
     }
     .gantt-timeline {
-        width: 100% !important;
-        min-width: 100% !important;
+        min-width: <?= $timelineWidth ?>px !important;
+        width: auto !important;
     }
     .no-print {
         display: none !important;
@@ -37,6 +40,10 @@
         display: block !important;
         text-align: start;
         margin-bottom: 20px;
+    }
+    .tooltiptext {
+        display: none !important;
+        visibility: hidden !important;
     }
     @page {
         size: landscape;
@@ -93,6 +100,22 @@ if ($overallEnd->format('N') != 7) {
     $overallEnd->modify('next sunday');
 }
 
+// Create array of days for consistent positioning
+$dayInterval = new DateInterval('P1D'); // Daily interval
+$dayPeriodEnd = clone $overallEnd;
+$dayPeriodEnd->modify('+1 day'); // DatePeriod excludes end date
+$dayPeriod = new DatePeriod($overallStart, $dayInterval, $dayPeriodEnd);
+
+$days = [];
+foreach ($dayPeriod as $day) {
+    $days[] = $day->format('Y-m-d');
+}
+
+$totalDays = count($days);
+$dayWidthPx = 20; // Width per day in pixels
+$timelineWidth = $totalDays * $dayWidthPx;
+
+// Create weeks for header
 $interval = new DateInterval('P1W'); // Weekly interval
 $periodEnd = clone $overallEnd;
 $periodEnd->modify('+1 day'); // DatePeriod excludes end date
@@ -104,10 +127,6 @@ foreach ($period as $weekStartDate) {
 }
 
 $totalWeeks = count($weeks);
-$weekWidthPercent = ($totalWeeks > 0) ? 100 / $totalWeeks : 0;
-
-// Total days in the *displayed* range for accurate percentage calculation
-$totalRangeDays = $overallEnd->diff($overallStart)->days + 1;
 
 // Calculate task info width based on task name width
 $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
@@ -119,6 +138,7 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
     position: relative;
     overflow-x: auto;
     padding: 10px;
+    scrollbar-width: thin;
 }
 .gantt-header {
     display: flex;
@@ -126,13 +146,15 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
     margin-bottom: 10px;
     font-size: 10px;
     font-weight: bold;
-    min-width: <?= $totalWeeks * 70 ?>px; /* Estimate min width based on weeks */
+    min-width: <?= $timelineWidth ?>px;
 }
 .gantt-week-header {
-    flex: 0 0 <?= $weekWidthPercent ?>%;
-    white-space: nowrap;
-    border-right: 1px dotted #eee;
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    border-right: 1px dotted #000;
     padding: 0 2px;
+    height: 30px;
 }
 .gantt-row {
     display: flex;
@@ -174,15 +196,8 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
 .gantt-timeline {
     flex-grow: 1;
     position: relative;
-    height: 25px; /* Height of the timeline bar area */
-    background: repeating-linear-gradient(
-        to right,
-        #fff,
-        #fff calc(<?= $weekWidthPercent ?>% - 1px),
-        #eee calc(<?= $weekWidthPercent ?>% - 1px),
-        #eee <?= $weekWidthPercent ?>%
-    );
-    min-width: 100%; /* Estimate min width */
+    height: 25px;
+    min-width: <?= $timelineWidth ?>px;
     border: 1px solid #0000004f;
     border-radius: 5px;
 }
@@ -193,6 +208,8 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
     background-color: #007bff; /* Blue */
     border-radius: 3px;
     opacity: 0.7;
+    cursor: pointer;
+    z-index: 1;
 }
 .gantt-progress {
     position: absolute;
@@ -202,6 +219,59 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
     background-color: #28a745; /* Green */
     border-radius: 3px;
     opacity: 0.9;
+}
+.day-grid-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: #ddd;
+}
+.week-grid-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: #943030;
+    z-index: 2;
+}
+
+/* Custom Tooltip Styles */
+.tooltip {
+  position: relative;
+}
+
+.tooltiptext {
+  visibility: hidden;
+  width: 220px;
+  background-color: #000;
+  color: #fff;
+  text-align: left;
+  border-radius: 6px;
+  padding: 10px;
+  line-height: 1.4;
+  font-size: 12px;
+
+  /* Position the tooltip */
+  position: absolute;
+  z-index: 100;
+  bottom: 120%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+}
+
+/* Weekend highlight style */
+.weekend-highlight {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background-color: #fff; /* Light yellow */
+  opacity: 0.5;
+  z-index: 2;
 }
 </style>
 
@@ -214,16 +284,34 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
         <div style="flex: 0 0 <?= $taskInfoWidth ?>px; padding-right: 15px; display: flex;" class='gantt-header-row'>
             <div class="task-column task-name">Task</div>
             <div class="task-column task-assignee">Assignee</div>
-            <div class="task-column task-duration">Duration (Days)</div>
+            <div class="task-column task-duration">Work Days <br> (Total Days)</div>
             <div class="task-column task-dates">Start Date</div>
             <div class="task-column task-dates">End Date</div>
             <div class="task-column task-progress">Expected <br>Progress</div>
         </div>
-        <?php foreach ($weeks as $weekStartStr): ?>
-            <div class="gantt-week-header">
-                <?= (new DateTime($weekStartStr))->format('d M'); // Show week start date ?>
-            </div>
-        <?php endforeach; ?>
+        <div style="position: relative; min-width: <?= $timelineWidth ?>px;">
+            <?php foreach ($weeks as $index => $weekStartStr): 
+                $weekStart = new DateTime($weekStartStr);
+                $weekWidth = 0;
+                $currentDay = clone $weekStart;
+                $dayCount = 0;
+                
+                // Calculate days in this week (or until the overall end date)
+                while ($dayCount < 7 && $currentDay <= $overallEnd) {
+                    $weekWidth += $dayWidthPx;
+                    $currentDay->modify('+1 day');
+                    $dayCount++;
+                }
+                
+                // Calculate position based on days from start
+                $daysFromStart = $weekStart->diff($overallStart)->days;
+                $leftPosition = $daysFromStart * $dayWidthPx;
+            ?>
+                <div class="gantt-week-header" style="position: absolute; left: <?= $leftPosition ?>px; width: <?= $weekWidth ?>px;">
+                    <?= $weekStart->format('d M Y'); ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
     </div>
 
     <!-- Task Rows -->
@@ -239,30 +327,78 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
         $clampedTaskStart = max($taskStartDate, $overallStart);
         $clampedTaskEnd   = min($taskEndDate, $overallEnd);
 
+        // Days from start for positioning
         $taskOffsetDays = $clampedTaskStart->diff($overallStart)->days;
         $taskDurationDays = $clampedTaskEnd->diff($clampedTaskStart)->days + 1;
 
-        // Calculate percentages based on the total *days* in the displayed range
-        $barLeftPercent = ($totalRangeDays > 0) ? ($taskOffsetDays / $totalRangeDays) * 100 : 0;
-        $barWidthPercent = ($totalRangeDays > 0) ? ($taskDurationDays / $totalRangeDays) * 100 : 0;
+        // Calculate pixel positions for exact alignment
+        $barLeftPx = $taskOffsetDays * $dayWidthPx;
+        $barWidthPx = $taskDurationDays * $dayWidthPx;
 
-        // Original duration for display
+        // Calculate business days (excluding weekends) for display
+        $businessDays = 0;
+        $currentDate = clone $taskStartDate;
+        while ($currentDate <= $taskEndDate) {
+            $dayOfWeek = (int)$currentDate->format('N'); // 1 (Monday) to 7 (Sunday)
+            if ($dayOfWeek < 6) { // Only count weekdays (Monday-Friday)
+                $businessDays++;
+            }
+            $currentDate->modify('+1 day');
+        }
+        
+        // Original duration for display (total calendar days)
         $originalDurationDays = $taskEndDate->diff($taskStartDate)->days + 1;
     ?>
         <div class="gantt-row">
             <div class="gantt-task-info">
                 <div class="task-column task-name" title="<?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?>"><?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?></div>
                 <div class="task-column task-assignee"><?= htmlspecialchars($t->assigned_to ?: 'N/A', ENT_QUOTES, 'UTF-8'); ?></div>
-                <div class="task-column task-duration"><?= $originalDurationDays ?></div>
+                <div class="task-column task-duration"><?= $businessDays ?> (<?= $originalDurationDays ?>)</div>
                 <div class="task-column task-dates"><?= $t->start_date ?></div>
                 <div class="task-column task-dates"><?= $t->end_date ?></div>
                 <div class="task-column task-progress"><?= $t->progress ?>%</div>
             </div>
             <div class="gantt-timeline">
-                <div class="gantt-bar" 
-                     style="left: <?= $barLeftPercent ?>%; width: <?= $barWidthPercent ?>%;"
-                     title="Task: <?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?> &#10;Assignee: <?= htmlspecialchars($t->assigned_to ?: 'N/A', ENT_QUOTES, 'UTF-8'); ?> &#10;Start Date: <?= $t->start_date ?> &#10;End Date: <?= $t->end_date ?> &#10;Progress: <?= $t->progress ?>% &#10;Duration: <?= $taskDurationDays ?> days">
+                <!-- Week grid lines -->
+                <?php foreach ($weeks as $weekStartStr): 
+                    $weekStart = new DateTime($weekStartStr);
+                    $daysFromStart = $weekStart->diff($overallStart)->days;
+                    $leftPosition = $daysFromStart * $dayWidthPx;
+                ?>
+                    <div class="week-grid-line" style="left: <?= $leftPosition ?>px;"></div>
+                <?php endforeach; ?>
+                
+                <!-- Day grid lines (lighter) -->
+                <?php for ($i = 0; $i < $totalDays; $i++): ?>
+                    <div class="day-grid-line" style="left: <?= $i * $dayWidthPx ?>px;"></div>
+                <?php endfor; ?>
+                
+                <!-- Weekend highlights -->
+                <?php 
+                for ($i = 0; $i < $totalDays; $i++): 
+                    $currentDay = clone $overallStart;
+                    $currentDay->modify('+' . $i . ' days');
+                    $dayOfWeek = (int)$currentDay->format('N'); // 1 (Monday) to 7 (Sunday)
+                    
+                    // Check if it's Saturday (6) or Sunday (7)
+                    if ($dayOfWeek == 6 || $dayOfWeek == 7): 
+                ?>
+                    <div class="weekend-highlight" style="left: <?= $i * $dayWidthPx ?>px; width: <?= $dayWidthPx ?>px;"></div>
+                <?php 
+                    endif;
+                endfor; 
+                ?>
+                
+                <div class="gantt-bar tooltip" style="left: <?= $barLeftPx ?>px; width: <?= $barWidthPx ?>px;">
                     <div class="gantt-progress" style="width: <?= $t->progress ?>%;"></div>
+                    <div class="tooltiptext">
+                        <strong>Task:</strong> <?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?><br>
+                        <strong>Assignee:</strong> <?= htmlspecialchars($t->assigned_to ?: 'N/A', ENT_QUOTES, 'UTF-8'); ?><br>
+                        <strong>Start Date:</strong> <?= $t->start_date ?><br>
+                        <strong>End Date:</strong> <?= $t->end_date ?><br>
+                        <strong>Progress:</strong> <?= $t->progress ?>%<br>
+                        <strong>Duration:</strong> <?= $businessDays ?> work days (<?= $originalDurationDays ?> days)
+                    </div>
                 </div>
             </div>
         </div>
