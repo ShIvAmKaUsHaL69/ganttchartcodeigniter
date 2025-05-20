@@ -10,6 +10,19 @@
                         <input type="text" name="name" id="name" class="form-control" value="<?= set_value('name', $project->name); ?>">
                         <?= form_error('name', '<small class="text-danger">', '</small>'); ?>
                     </div>
+                    <div class="form-group">
+                        <label for="created_by">Created By</label>
+                        <input type="text" name="created_by" id="created_by" class="form-control" value="<?= set_value('created_by', $project->created_by); ?>">
+                        <?= form_error('created_by', '<small class="text-danger">', '</small>'); ?>
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Status</label>
+                        <select name="status" id="status" class="form-control">
+                            <option value="0" <?= $project->status == 0 ? 'selected' : ''; ?>>In Progress</option>
+                            <option value="1" <?= $project->status == 1 ? 'selected' : ''; ?>>Completed</option>
+                            <option value="2" <?= $project->status == 2 ? 'selected' : ''; ?>>Hold</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="form-group">

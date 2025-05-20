@@ -38,9 +38,9 @@
             </div>
             <div class="col-md-6">
                 <div class="form-group">
-                    <label for="end_date">End Date</label>
-                    <input type="date" name="end_date" id="end_date" class="form-control" value="<?= set_value('end_date'); ?>">
-                    <?= form_error('end_date', '<small class="text-danger">', '</small>'); ?>
+                    <label for="expected_end_date">Expected End Date</label>
+                    <input type="date" name="expected_end_date" id="expected_end_date" class="form-control" value="<?= set_value('expected_end_date'); ?>">
+                    <?= form_error('expected_end_date', '<small class="text-danger">', '</small>'); ?>
                 </div>
             </div>
         </div>
@@ -52,6 +52,30 @@
                     <?= form_error('progress', '<small class="text-danger">', '</small>'); ?>
                 </div>
             </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select name="status" id="status" class="form-control" onchange="toggleEndDate(this.value)">
+                        <option value="0" <?= set_select('status', '0'); ?>>In Progress</option>
+                        <option value="2" <?= set_select('status', '2'); ?>>Hold</option>
+                        <option value="1" <?= set_select('status', '1'); ?>>Completed</option>
+                    </select>
+                </div>
+                <div class="form-group" id="endDateGroup" style="display: none;">
+                    <label for="end_date">End Date</label>
+                    <input type="date" name="end_date" id="end_date" class="form-control" value="<?= set_value('end_date'); ?>">
+                </div>
+            </div>
+            <script>
+            function toggleEndDate(status) {
+                var endDateGroup = document.getElementById('endDateGroup');
+                if (status === '1') { // Completed
+                    endDateGroup.style.display = 'block';
+                } else {
+                    endDateGroup.style.display = 'none';
+                }
+            }
+            </script>
         </div>
         <div class="form-group">
             <button class="btn btn-primary">Save</button>

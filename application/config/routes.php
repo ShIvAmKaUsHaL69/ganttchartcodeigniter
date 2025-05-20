@@ -52,6 +52,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 $route['default_controller'] = 'projects';
 $route['projects/tasks/(:any)'] = 'projects/tasks/$1';
 $route['projects/add_task/(:any)'] = 'projects/add_task/$1';
+$route['projects/all_completed'] = 'projects/all_completed';
 $route['projects/edit_task/(:any)/(:any)'] = 'projects/edit_task/$1/$2';
 $route['projects/delete_task/(:any)/(:any)'] = 'projects/delete_task/$1/$2';
 $route['projects/gantt/(:any)'] = 'projects/gantt/$1';

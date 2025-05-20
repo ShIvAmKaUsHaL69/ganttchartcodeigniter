@@ -28,9 +28,9 @@
                 </div>
                 <div class="col-md-6">
                     <div class="form-group">
-                        <label for="end_date">End Date</label>
-                        <input type="date" name="end_date" id="end_date" class="form-control" value="<?= set_value('end_date', $task->end_date); ?>">
-                        <?= form_error('end_date', '<small class="text-danger">', '</small>'); ?>
+                        <label for="expected_end_date">Expected End Date</label>
+                        <input type="date" name="expected_end_date" id="expected_end_date" class="form-control" value="<?= set_value('expected_end_date', $task->expected_end_date); ?>">
+                        <?= form_error('expected_end_date', '<small class="text-danger">', '</small>'); ?>
                     </div>
                 </div>
             </div>
@@ -40,6 +40,16 @@
                         <label for="progress">Progress (%)</label>
                         <input type="number" name="progress" id="progress" class="form-control" value="<?= set_value('progress', $task->progress); ?>" min="0" max="100">
                         <?= form_error('progress', '<small class="text-danger">', '</small>'); ?>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="status">Status</label>
+                        <select name="status" id="status" class="form-control"">
+                            <option value="0" <?= $task->status == 0 ? 'selected' : ''; ?>>In Progress</option>
+                            <option value="2" <?= $task->status == 2 ? 'selected' : ''; ?>>Hold</option>
+                            <option value="1" <?= $task->status == 1 ? 'selected' : ''; ?>>Completed</option>
+                        </select>
                     </div>
                 </div>
             </div>

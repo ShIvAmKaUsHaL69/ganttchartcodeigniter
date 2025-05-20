@@ -57,7 +57,34 @@
         <h3>Gantt Chart – <?= htmlspecialchars($project->name, ENT_QUOTES, 'UTF-8'); ?></h3>
         <a href="<?= site_url('projects/tasks/'.$project->id); ?>" class="btn btn-secondary no-print">Back to Tasks</a>
     </div>
-    <button id="exportPdf" class="btn btn-primary no-print"><i class="fas fa-file-pdf"></i> Export as PDF</button>
+    <div class="d-flex flex-column flex-md-row">
+        <button id="exportPdf" class="btn btn-primary no-print"><i class="fas fa-file-pdf"></i> Export as PDF</button>
+    </div>
+</div>
+<div class="input-group mb-3 mr-md-2 no-print">
+    <input type="text" id="ganttSearch" class="form-control" placeholder="Search tasks, assignees, status...">
+</div>
+
+<div class="color-legend-box no-print mb-3">
+    <h6 class="mb-2">Color Legend:</h6>
+    <div class="d-flex flex-wrap">
+        <div class="legend-item">
+            <span class="color-box" style="background-color: #007bff;"></span>
+            <span class="legend-text">Task Duration (Start to Expected End)</span>
+        </div>
+        <div class="legend-item">
+            <span class="color-box" style="background-color: #fff; border: 1px solid #ddd;"></span>
+            <span class="legend-text">Weekend (Saturday/Sunday)</span>
+        </div>
+        <div class="legend-item">
+            <span class="color-box" style="background-color: darkred;"></span>
+            <span class="legend-text">Late Completion</span>
+        </div>
+        <div class="legend-item">
+            <span class="color-box" style="background-color: #00ff3a;"></span>
+            <span class="legend-text">Early Completion</span>
+        </div>
+    </div>
 </div>
 
 <?php
@@ -130,7 +157,6 @@ $totalWeeks = count($weeks);
 
 // Calculate task info width based on task name width
 $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
-
 ?>
 
 <style>
@@ -273,6 +299,59 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
   opacity: 0.5;
   z-index: 2;
 }
+
+/* Performance overlay styles */
+.gantt-performance {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    opacity: 0.4;
+    z-index: 3;
+}
+
+/* Hide previously added header-level day boxes */
+.day-of-week-box {
+    display: none !important;
+}
+
+/* Day-of-week cell inside each task row */
+.day-of-week-cell {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+    pointer-events: none;
+    width: <?= $dayWidthPx ?>px;
+    z-index: 10; /* Behind bars */
+}
+
+.color-legend-box {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 10px 15px;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin-right: 20px;
+    margin-bottom: 5px;
+}
+.color-box {
+    display: inline-block;
+    width: 20px;
+    height: 15px;
+    margin-right: 5px;
+    border-radius: 3px;
+}
+.legend-text {
+    font-size: 13px;
+}
 </style>
 
 <div id="ganttChart" class="gantt-container">
@@ -286,8 +365,9 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
             <div class="task-column task-assignee">Assignee</div>
             <div class="task-column task-duration">Work Days <br> (Total Days)</div>
             <div class="task-column task-dates">Start Date</div>
+            <div class="task-column task-dates">Expected End Date</div>
             <div class="task-column task-dates">End Date</div>
-            <div class="task-column task-progress">Expected <br>Progress</div>
+            <div class="task-column task-dates">Status</div>
         </div>
         <div style="position: relative; min-width: <?= $timelineWidth ?>px;">
             <?php foreach ($weeks as $index => $weekStartStr): 
@@ -311,13 +391,24 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
                     <?= $weekStart->format('d M Y'); ?>
                 </div>
             <?php endforeach; ?>
+
+            <!-- Day-of-week boxes (M T W T F S S) -->
+            <?php foreach ($days as $index => $dayStr):
+                $dayDateObj = new DateTime($dayStr);
+                $dayLetter = strtoupper(substr($dayDateObj->format('D'), 0, 1));
+                $leftPos = $index * $dayWidthPx;
+            ?>
+                <div class="day-of-week-box" style="left: <?= $leftPos ?>px;">
+                    <?= $dayLetter ?>
+                </div>
+            <?php endforeach; ?>
         </div>
     </div>
 
     <!-- Task Rows -->
     <?php foreach ($tasks as $t):
         $taskStartDate = new DateTime($t->start_date);
-        $taskEndDate   = new DateTime($t->end_date);
+        $taskEndDate   = new DateTime($t->expected_end_date);
 
         // Ensure task dates are within the overall calculated range for safety
         if ($taskEndDate < $overallStart || $taskStartDate > $overallEnd) {
@@ -355,8 +446,9 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
                 <div class="task-column task-assignee"><?= htmlspecialchars($t->assigned_to ?: 'N/A', ENT_QUOTES, 'UTF-8'); ?></div>
                 <div class="task-column task-duration"><?= $businessDays ?> (<?= $originalDurationDays ?>)</div>
                 <div class="task-column task-dates"><?= $t->start_date ?></div>
-                <div class="task-column task-dates"><?= $t->end_date ?></div>
-                <div class="task-column task-progress"><?= $t->progress ?>%</div>
+                <div class="task-column task-dates"><?= $t->expected_end_date ?></div>
+                <div class="task-column task-dates"><?= $t->end_date ? $t->end_date : 'Not Completed' ?></div>
+                <div class="task-column task-dates"><?= $t->status == 0 ? 'In Progress' : ($t->status == 1 ? 'Completed' : 'Hold') ?></div>
             </div>
             <div class="gantt-timeline">
                 <!-- Week grid lines -->
@@ -371,6 +463,17 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
                 <!-- Day grid lines (lighter) -->
                 <?php for ($i = 0; $i < $totalDays; $i++): ?>
                     <div class="day-grid-line" style="left: <?= $i * $dayWidthPx ?>px;"></div>
+                <?php endfor; ?>
+                
+                <!-- Day letters for this row (M T W T F S S) -->
+                <?php for ($di = 0; $di < $totalDays; $di++):
+                        $currentDay = clone $overallStart;
+                        $currentDay->modify('+' . $di . ' days');
+                        $dayLetter = strtoupper(substr($currentDay->format('D'), 0, 1));
+                ?>
+                    <div class="day-of-week-cell" style="left: <?= $di * $dayWidthPx ?>px;">
+                        <?= $dayLetter ?>
+                    </div>
                 <?php endfor; ?>
                 
                 <!-- Weekend highlights -->
@@ -389,15 +492,49 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
                 endfor; 
                 ?>
                 
+                <!-- Performance overlay for early / late completion -->
+                <?php 
+                    if (!empty($t->end_date)) {
+                        $actualEnd = new DateTime($t->end_date);
+                        $expectedEnd = clone $taskEndDate; // already set to expected_end_date
+                        if ($actualEnd < $expectedEnd) {
+                            // Finished early – green boxes between actualEnd+1 and expectedEnd
+                            $colorStart = clone $actualEnd;
+                            $colorStart->modify('+1 day');
+                            $colorEnd = clone $expectedEnd;
+                            $perfColor = '#00ff3a'; // green
+                        } elseif ($actualEnd > $expectedEnd) {
+                            // Finished late – red boxes between expectedEnd+1 and actualEnd
+                            $colorStart = clone $expectedEnd;
+                            $colorStart->modify('+1 day');
+                            $colorEnd = clone $actualEnd;
+                            $perfColor = 'darkred'; // red
+                        }
+
+                        if (isset($perfColor)) {
+                            // Ensure dates lie within overall range
+                            if ($colorStart < $overallStart) $colorStart = clone $overallStart;
+                            if ($colorEnd > $overallEnd) $colorEnd = clone $overallEnd;
+
+                            $perfOffsetDays = $colorStart->diff($overallStart)->days;
+                            $perfDurationDays = $colorEnd->diff($colorStart)->days + 1;
+                            $perfLeftPx = $perfOffsetDays * $dayWidthPx;
+                            $perfWidthPx = $perfDurationDays * $dayWidthPx;
+                ?>
+                            <div class="gantt-performance" style="left: <?= $perfLeftPx ?>px; width: <?= $perfWidthPx ?>px; background-color: <?= $perfColor ?>; opacity: 0.7 !important; border-radius: 3px;"></div>
+                <?php       }
+                    }
+                ?>
+                
                 <div class="gantt-bar tooltip" style="left: <?= $barLeftPx ?>px; width: <?= $barWidthPx ?>px;">
-                    <div class="gantt-progress" style="width: <?= $t->progress ?>%;"></div>
                     <div class="tooltiptext">
                         <strong>Task:</strong> <?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?><br>
                         <strong>Assignee:</strong> <?= htmlspecialchars($t->assigned_to ?: 'N/A', ENT_QUOTES, 'UTF-8'); ?><br>
                         <strong>Start Date:</strong> <?= $t->start_date ?><br>
-                        <strong>End Date:</strong> <?= $t->end_date ?><br>
-                        <strong>Progress:</strong> <?= $t->progress ?>%<br>
-                        <strong>Duration:</strong> <?= $businessDays ?> work days (<?= $originalDurationDays ?> days)
+                        <strong>Expected End Date:</strong> <?= $t->expected_end_date ?><br>
+                        <strong>End Date:</strong> <?= $t->end_date ? $t->end_date : 'Not Completed' ?><br>
+                        <strong>Duration:</strong> <?= $businessDays ?> work days (<?= $originalDurationDays ?> days)<br>
+                        <strong>Status:</strong> <?= $t->status == 0 ? 'In Progress' : ($t->status == 1 ? 'Completed' : 'Hold') ?>
                     </div>
                 </div>
             </div>
@@ -441,6 +578,42 @@ document.getElementById('exportPdf').addEventListener('click', function() {
             ganttChart.style.transform = originalTransform;
         }, 500);
     }, 100);
+});
+
+// Add search functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('ganttSearch');
+    const ganttRows = document.querySelectorAll('.gantt-row');
+    
+    searchInput.addEventListener('keyup', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        
+        ganttRows.forEach(function(row) {
+            // Extract searchable text from the row
+            const taskName = row.querySelector('.task-name').textContent.toLowerCase();
+            const assignee = row.querySelector('.task-assignee').textContent.toLowerCase();
+            const status = row.querySelector('.task-column:nth-last-child(1)').textContent.toLowerCase();
+            
+            // Check if any of the fields match the search term
+            if (taskName.includes(searchTerm) || 
+                assignee.includes(searchTerm) || 
+                status.includes(searchTerm)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+    
+    // Clear search on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.activeElement === searchInput) {
+            searchInput.value = '';
+            ganttRows.forEach(function(row) {
+                row.style.display = '';
+            });
+        }
+    });
 });
 </script>
 
