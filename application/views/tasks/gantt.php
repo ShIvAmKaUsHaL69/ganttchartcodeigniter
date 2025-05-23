@@ -5,16 +5,14 @@
     body * {
         visibility: hidden;
     }
-    #ganttChart, #ganttChart * {
+    #ganttChart, #ganttChart *, .color-legend-box, .color-legend-box *, .print-title, .print-title * {
         visibility: visible;
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
         color-adjust: exact;
     }
     #ganttChart {
-        position: absolute;
-        left: 0;
-        top: 0;
+        position: relative;
         transform-origin: top left;
         width: 100%;
         max-width: none !important;
@@ -47,7 +45,14 @@
     }
     @page {
         size: landscape;
-        margin: 1cm;
+        margin: 0 0.5cm;
+    }
+
+    /* Added style for the legend in print */
+    .color-legend-box {
+        display: block !important;
+        position: relative; /* Keep it in flow */
+        margin-bottom: 20px; /* Space before the chart */
     }
 }
 </style>
@@ -65,7 +70,11 @@
     <input type="text" id="ganttSearch" class="form-control" placeholder="Search tasks, assignees, status...">
 </div>
 
-<div class="color-legend-box no-print mb-3">
+<div class="print-title" style="display: none; margin-top: -50px;">
+    <h2><?= htmlspecialchars($project->name, ENT_QUOTES, 'UTF-8'); ?></h2>
+</div>
+
+<div class="color-legend-box mb-3">
     <h6 class="mb-2">Color Legend:</h6>
     <div class="d-flex flex-wrap">
         <div class="legend-item">
@@ -109,8 +118,34 @@ $taskNameWidth = max(150, 150 + ($maxTaskNameLength - 15) * 8);
 $minDateStr = null;
 $maxDateStr = null;
 foreach ($tasks as $t) {
-    if ($minDateStr === null || $t->start_date < $minDateStr) $minDateStr = $t->start_date;
-    if ($maxDateStr === null || $t->end_date > $maxDateStr) $maxDateStr = $t->end_date;
+    if (!empty($t->start_date) && ($minDateStr === null || $t->start_date < $minDateStr)) {
+        $minDateStr = $t->start_date;
+    }
+    
+    // Check both end_date and expected_end_date to determine the latest date
+    if (!empty($t->end_date) && ($maxDateStr === null || $t->end_date > $maxDateStr)) {
+        $maxDateStr = $t->end_date;
+    }
+    
+    if (!empty($t->expected_end_date) && ($maxDateStr === null || $t->expected_end_date > $maxDateStr)) {
+        $maxDateStr = $t->expected_end_date;
+    }
+}
+
+// Provide fallback dates if not found
+if ($minDateStr === null) {
+    $minDateStr = date('Y-m-d'); // Use today as fallback
+}
+if ($maxDateStr === null) {
+    // If we have a start date but no end date, default to 2 weeks from start
+    if ($minDateStr !== null) {
+        $tempDate = new DateTime($minDateStr);
+        $tempDate->modify('+2 weeks');
+        $maxDateStr = $tempDate->format('Y-m-d');
+    } else {
+        // Both dates null, use today + 2 weeks
+        $maxDateStr = date('Y-m-d', strtotime('+2 weeks'));
+    }
 }
 
 // Adjust range to encompass full weeks (Monday to Sunday)
@@ -355,9 +390,6 @@ $taskInfoWidth = $taskNameWidth + 430; // 430px for other columns
 </style>
 
 <div id="ganttChart" class="gantt-container">
-    <div class="print-title" style="display: none;">
-        <h2><?= htmlspecialchars($project->name, ENT_QUOTES, 'UTF-8'); ?></h2>
-    </div>
     <!-- Header Row -->
     <div class="gantt-header">
         <div style="flex: 0 0 <?= $taskInfoWidth ?>px; padding-right: 15px; display: flex;" class='gantt-header-row'>

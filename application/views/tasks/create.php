@@ -94,7 +94,7 @@
         <div class="form-group">
             <label for="excel_file">Upload Excel File</label>
             <input type="file" name="excel_file" id="excel_file" class="form-control" accept=".xlsx, .xls, .csv">
-            <small class="form-text text-muted">Excel file should have these columns: Task Name, Assigned To, Start Date, End Date, Progress</small>
+            <small class="form-text text-muted">Excel file should have these columns: Task Name, Assigned To, Start Date, Expected End Date, Progress, Status</small>
             <?php if(isset($excel_error)): ?>
                 <small class="text-danger"><?= $excel_error; ?></small>
             <?php endif; ?>

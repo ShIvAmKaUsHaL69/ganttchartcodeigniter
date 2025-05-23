@@ -168,15 +168,14 @@ class Projects extends MY_Controller
         $sheet->setCellValue('B1', 'Assigned To');
         $sheet->setCellValue('C1', 'Start Date (DD-MM-YYYY)');
         $sheet->setCellValue('D1', 'Expected End Date (DD-MM-YYYY)');
-        $sheet->setCellValue('E1', 'End Date (DD-MM-YYYY) (Optional)');
-        $sheet->setCellValue('F1', 'Progress (%)');
-        $sheet->setCellValue('G1', 'Status (0 = In Progress, 1 = Completed, 2 = Hold)');
+        $sheet->setCellValue('E1', 'Progress (%)');
+        $sheet->setCellValue('F1', 'Status (0 = In Progress, 1 = Completed, 2 = Hold)');
         
         // Make the heading row bold
-        $sheet->getStyle('A1:G1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:F1')->getFont()->setBold(true);
         
         // Auto-size columns
-        foreach(range('A', 'G') as $column) {
+        foreach(range('A', 'F') as $column) {
             $sheet->getColumnDimension($column)->setAutoSize(true);
         }
         
@@ -185,9 +184,8 @@ class Projects extends MY_Controller
         $sheet->setCellValue('B2', 'John Doe');
         $sheet->setCellValue('C2', date('d-m-Y'));
         $sheet->setCellValue('D2', date('d-m-Y', strtotime('+1 week')));
-        $sheet->setCellValue('E2', date('d-m-Y'));
+        $sheet->setCellValue('E2', '0');
         $sheet->setCellValue('F2', '0');
-        $sheet->setCellValue('G2', '0');
 
         // Set content-type and filename
         $filename = 'tasks_template.xlsx';
@@ -262,9 +260,8 @@ class Projects extends MY_Controller
                 $assigned_to = $worksheet->getCellByColumnAndRow(2, $row)->getValue();
                 $start_date = $worksheet->getCellByColumnAndRow(3, $row)->getValue();
                 $expected_end_date = $worksheet->getCellByColumnAndRow(4, $row)->getValue();
-                $end_date = $worksheet->getCellByColumnAndRow(5, $row)->getValue();
-                $progress = $worksheet->getCellByColumnAndRow(6, $row)->getValue();
-                $status = $worksheet->getCellByColumnAndRow(7, $row)->getValue();
+                $progress = $worksheet->getCellByColumnAndRow(5, $row)->getValue();
+                $status = $worksheet->getCellByColumnAndRow(6, $row)->getValue();
 
                 // Skip empty rows
                 if (empty($task_name)) {
@@ -274,21 +271,31 @@ class Projects extends MY_Controller
                 // Format dates if they are Excel date values
                 if (is_numeric($start_date)) {
                     $start_date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($start_date)->format('Y-m-d');
+                } else {
+                    $dt = DateTime::createFromFormat('d-m-Y', $start_date);
+                    if ($dt) { $start_date = $dt->format('Y-m-d'); }
                 }
                 
-                if (is_numeric($end_date)) {
-                    $end_date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($end_date)->format('Y-m-d');
+                if (is_numeric($expected_end_date)) {
+                    $expected_end_date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($expected_end_date)->format('Y-m-d');
+                } else {
+                    $dtExp = DateTime::createFromFormat('d-m-Y', $expected_end_date);
+                    if ($dtExp) { $expected_end_date = $dtExp->format('Y-m-d'); }
                 }
                 
                 // Validate data
-                if (empty($task_name) || empty($start_date) || empty($end_date)) {
+                if (empty($task_name) || empty($start_date) || empty($expected_end_date)) {
                     $tasks_skipped++;
                     continue;
                 }
                 
-                // Set progress to 0 if not provided
-                $progress = empty($progress) ? 0 : (int)$progress;
-                
+                // Sanitize numeric columns
+                $progress = is_numeric($progress) ? min(max((int)$progress, 0), 100) : 0;
+                $status   = in_array((int)$status, [0,1,2], true) ? (int)$status : 0;
+
+                // Completed tasks get an end_date of today if none provided
+                $end_date = $status === 1 ? date('Y-m-d') : null;
+
                 // Prepare task data
                 $payload = [
                     'project_id' => $project_id,
@@ -296,7 +303,7 @@ class Projects extends MY_Controller
                     'assigned_to'=> $assigned_to,
                     'start_date' => $start_date,
                     'expected_end_date' => $expected_end_date,
-                    'end_date'   => $end_date ? $end_date : null,
+                    'end_date'   => $end_date,
                     'progress'   => $progress,
                     'status'     => $status,
                     'modified_at' => date('Y-m-d')
@@ -308,6 +315,9 @@ class Projects extends MY_Controller
             }
             
             // Delete the uploaded file
+            if (file_exists($file_path)) {
+                unlink($file_path);
+            }
             
             // Set success message
             $this->session->set_flashdata('success', "Imported $tasks_added tasks successfully. Skipped $tasks_skipped tasks.");
