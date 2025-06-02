@@ -2,8 +2,22 @@
 <h3>Tasks for Project: <?= htmlspecialchars($project->name, ENT_QUOTES, 'UTF-8'); ?></h3>
 <div class="d-flex flex-wrap mb-3 ">
     <a href="<?= site_url('projects'); ?>" class="btn btn-secondary mr-2 mb-2">Back to Projects</a>
-    <a href="<?= site_url('projects/add_task/'.$project->id); ?>" class="btn btn-primary mb-2">Add Task</a>
+    <a href="<?= site_url('projects/add_task/'.$project->id); ?>" class="btn btn-primary mb-2 mr-2">Add Task</a>
+    <a href="<?= site_url('projects/add_note/'.$project->id); ?>" class="btn btn-danger mb-2">Add Change-Note</a>
     <a href="<?= site_url('projects/gantt/'.$project->id); ?>" class="btn btn-info mb-2 ml-2">View Gantt Chart</a>
+</div>
+<div class="d-flex flex-wrap mb-3" style="gap: 20px;">
+<p class="font-weight-bold">Color Legend:</p>
+<div class="d-flex flex-wrap mb-3">
+    <div class="legend-item" style="background-color: #f8d7da; width: 20px; height: 20px; border: 1px solid #ddd;"></div>
+    <span style="width: 10px;"></span>
+    <span class="legend-text">Change-Note Task</span>
+</div>
+<div class="d-flex flex-wrap mb-3">
+    <div class="legend-item" style="background-color: #eed19a; width: 20px; height: 20px; border: 1px solid #ddd;"></div>
+    <span style="width: 10px;"></span>
+    <span class="legend-text">Discarded Task</span>
+</div>
 </div>
 
 <?php if (count($tasks)): ?>
@@ -28,7 +42,7 @@
         <?php
         $srno = 1;
         foreach ($tasks as $t): ?>
-            <tr>
+            <tr <?= isset($t->is_note_task) && $t->is_note_task == 1 ? 'style="background-color: #f8d7da;"' : ($t->status == 3 ? 'style="background-color: #eed19a"' : ''); ?>>
                 <td><?= $srno++; ?></td>
                 <td><?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?></td>
                 <td><?= htmlspecialchars($t->assigned_to, ENT_QUOTES, 'UTF-8'); ?></td>
@@ -48,7 +62,7 @@
                 <td><?= $t->end_date ? $t->end_date : 'Not Completed'; ?></td>
                 <td><?= $t->progress; ?>%</td>
                 <td><?= $t->modified_at; ?></td>
-                <td><?= $t->status == 0 ? 'In Progress' : ($t->status == 1 ? 'Completed' : 'Hold'); ?></td>
+                <td><?= $t->status == 0 ? 'In Progress' : ($t->status == 1 ? 'Completed' : ($t->status == 2 ? 'Hold' : 'Discarded')); ?></td>
                 <td>
                     <div class="d-flex flex-column d-md-block">
                         <a href="<?= site_url('projects/edit_task/'.$project->id.'/'.$t->id); ?>" class="btn btn-sm btn-warning mb-1 mb-md-0 mr-md-1">Edit</a>

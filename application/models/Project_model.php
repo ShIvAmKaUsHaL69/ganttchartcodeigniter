@@ -51,4 +51,24 @@ class Project_model extends CI_Model
         $this->db->delete($this->table, ['id' => $id]);
         return $this->db->affected_rows();
     }
+
+    public function update_share_token($id, $token)
+    {
+        // Stores or updates the randomized share token for a project
+        $this->db->where('id', $id)->update($this->table, [
+            'share_token' => $token
+        ]);
+        return $this->db->affected_rows();
+    }
+
+    /**
+     * Fetch a project row via its public share token
+     *
+     * @param string $token
+     * @return object|null
+     */
+    public function get_by_share_token($token)
+    {
+        return $this->db->get_where($this->table, ['share_token' => $token])->row();
+    }
 } 

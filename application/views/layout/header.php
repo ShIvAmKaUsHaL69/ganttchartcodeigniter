@@ -6,7 +6,7 @@
     <title>Gantt Chart App</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+
     <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap4.min.css">
     <style>
         @media (max-width: 768px) {
@@ -34,7 +34,7 @@
             border: 0 !important;
         }
         div.dataTables_wrapper div.dataTables_length select {
-            width: 50px;
+            width: 60px;
         }
     </style>
 </head>

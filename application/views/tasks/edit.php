@@ -49,6 +49,7 @@
                             <option value="0" <?= $task->status == 0 ? 'selected' : ''; ?>>In Progress</option>
                             <option value="2" <?= $task->status == 2 ? 'selected' : ''; ?>>Hold</option>
                             <option value="1" <?= $task->status == 1 ? 'selected' : ''; ?>>Completed</option>
+                            <option value="3" <?= $task->status == 3 ? 'selected' : ''; ?>>Discarded</option>
                         </select>
                     </div>
                 </div>

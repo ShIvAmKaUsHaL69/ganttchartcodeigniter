@@ -56,5 +56,7 @@ $route['projects/all_completed'] = 'projects/all_completed';
 $route['projects/edit_task/(:any)/(:any)'] = 'projects/edit_task/$1/$2';
 $route['projects/delete_task/(:any)/(:any)'] = 'projects/delete_task/$1/$2';
 $route['projects/gantt/(:any)'] = 'projects/gantt/$1';
+$route['projects/generate_share_link/(:any)'] = 'projects/generate_share_link/$1';
+$route['share/(:any)'] = 'share/view/$1';
 $route['404_override'] = '';
 $route['translate_uri_dashes'] = FALSE;
