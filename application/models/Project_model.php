@@ -7,7 +7,11 @@ class Project_model extends CI_Model
 
     public function get_all()
     {
-        return $this->db->order_by('created_at', 'DESC')->get($this->table)->result();
+        $this->db->select('projects.*, users.username AS creator_username');
+        $this->db->from($this->table);
+        $this->db->join('users', 'users.id = projects.created_by', 'left');
+        $this->db->order_by('projects.created_at', 'DESC');
+        return $this->db->get()->result();
     }
 
     public function get($id)
@@ -70,5 +74,21 @@ class Project_model extends CI_Model
     public function get_by_share_token($token)
     {
         return $this->db->get_where($this->table, ['share_token' => $token])->row();
+    }
+
+    /**
+     * Fetch all projects created by a specific user id.
+     *
+     * @param int $user_id
+     * @return array
+     */
+    public function get_by_creator($user_id)
+    {
+        $this->db->select('projects.*, users.username AS creator_username');
+        $this->db->from($this->table);
+        $this->db->join('users', 'users.id = projects.created_by', 'left');
+        $this->db->where('projects.created_by', $user_id);
+        $this->db->order_by('projects.created_at', 'DESC');
+        return $this->db->get()->result();
     }
 } 

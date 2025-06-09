@@ -10,12 +10,6 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  */
 class MY_Controller extends CI_Controller
 {
-    /**
-     * SHA-256 hash of the valid password (defined in constants.php).
-     * @var string
-     */
-    private $password_hash;
-
     public function __construct()
     {
         parent::__construct();
@@ -23,16 +17,14 @@ class MY_Controller extends CI_Controller
         // Ensure session library loaded (also autoloaded globally).
         $this->load->library('session');
 
-        // Determine password hash
-        $this->password_hash = defined('GANTT_PASSWORD_HASH') ? GANTT_PASSWORD_HASH : hash('sha256', 'ekarigar@gantt');
-
-        // Let the Auth controller itself bypass the gate (prevents loop)
-        if (strtolower($this->router->fetch_class()) === 'auth') {
+        // Controllers that are publicly accessible should be whitelisted.
+        $publicControllers = ['auth', 'share'];
+        if (in_array(strtolower($this->router->fetch_class()), $publicControllers, true)) {
             return;
         }
 
-        // If session does not contain the correct hash, redirect to login
-        if ($this->session->userdata('gantt_auth') !== $this->password_hash) {
+        // If user is not logged in, redirect to login page.
+        if (!$this->session->userdata('user_id')) {
             $this->session->set_userdata('redirect_after_login', current_url());
             redirect('auth/login');
         }

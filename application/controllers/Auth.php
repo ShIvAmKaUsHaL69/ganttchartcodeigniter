@@ -7,20 +7,23 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  */
 class Auth extends CI_Controller
 {
-    private $password_hash;
+    /**
+     * @var User_model
+     */
+    public $user;
 
     public function __construct()
     {
         parent::__construct();
         $this->load->library('session');
         $this->load->helper(array('url', 'form'));
-        $this->password_hash = GANTT_PASSWORD_HASH;
+        $this->load->model('User_model', 'user');
     }
 
     public function login()
     {
-        // If already authenticated, redirect to default controller
-        if ($this->session->userdata('gantt_auth') === $this->password_hash) {
+        // Already logged in? Redirect to home.
+        if ($this->session->userdata('user_id')) {
             $redirect = $this->session->userdata('redirect_after_login') ?: base_url();
             $this->session->unset_userdata('redirect_after_login');
             redirect($redirect);
@@ -28,22 +31,31 @@ class Auth extends CI_Controller
 
         $data = [];
         if ($this->input->post()) {
+            $identity = $this->input->post('identity', true); // username or email
             $password = $this->input->post('password', true);
-            if (hash('sha256', $password) === $this->password_hash) {
-                $this->session->set_userdata('gantt_auth', $this->password_hash);
+
+            $user = $this->user->get_by_identity($identity);
+            if ($user && $password == $user->password) {
+                // Successful login
+                $this->session->set_userdata([
+                    'user_id'   => $user->id,
+                    'user_role' => (int)$user->role, // 0 = user, 1 = admin
+                ]);
+
                 $redirect = $this->session->userdata('redirect_after_login') ?: base_url();
                 $this->session->unset_userdata('redirect_after_login');
                 redirect($redirect);
             } else {
-                $data['error'] = 'Incorrect password. Please try again.';
+                $data['error'] = 'Invalid username/email or password.';
             }
         }
+
         $this->load->view('auth/login', $data);
     }
 
     public function logout()
     {
-        $this->session->unset_userdata('gantt_auth');
+        $this->session->unset_userdata(['user_id', 'user_role']);
         redirect('auth/login');
     }
 } 

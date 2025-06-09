@@ -56,7 +56,7 @@ if (isset($projects) && is_array($projects)) {
             <tr>
                 <td><?= $srno++; ?></td>
                 <td><a href="<?= site_url('projects/tasks/'.$proj->id); ?>"><?= htmlspecialchars($proj->name, ENT_QUOTES, 'UTF-8'); ?></a></td>
-                <td><?= $proj->created_by; ?></td>
+                <td><?= htmlspecialchars($proj->creator_username ?? 'N/A', ENT_QUOTES, 'UTF-8'); ?></td>
                 <td><?= $proj->status == 0 ? 'In Progress' : ($proj->status == 1 ? 'Completed' : 'Hold'); ?></td>
                 <td><?= $proj->created_at; ?></td>
                 <td>

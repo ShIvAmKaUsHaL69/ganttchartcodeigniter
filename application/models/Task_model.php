@@ -35,4 +35,21 @@ class Task_model extends CI_Model
         $this->db->delete($this->table, ['id' => $id]);
         return $this->db->affected_rows();
     }
+
+    /**
+     * Get all tasks for a project that start after a specific date
+     * 
+     * @param int $project_id The project ID
+     * @param string $date The date in Y-m-d format
+     * @return array Array of task objects
+     */
+    public function get_tasks_after_date($project_id, $date)
+    {
+        return $this->db
+            ->where('project_id', $project_id)
+            ->where('start_date >', $date)
+            ->order_by('start_date', 'ASC')
+            ->get($this->table)
+            ->result();
+    }
 } 

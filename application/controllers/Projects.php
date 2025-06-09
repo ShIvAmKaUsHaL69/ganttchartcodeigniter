@@ -23,7 +23,16 @@ class Projects extends MY_Controller
 
     public function index()
     {
-        $data['projects'] = $this->project->get_all();
+        $user_role = (int)$this->session->userdata('user_role');
+        $user_id   = (int)$this->session->userdata('user_id');
+
+        if ($user_role === 1) {
+            // Admin - see every project
+            $data['projects'] = $this->project->get_all();
+        } else {
+            // Regular user - only own projects
+            $data['projects'] = $this->project->get_by_creator($user_id);
+        }
         $this->load->view('projects/index', $data);
     }
 
@@ -31,9 +40,12 @@ class Projects extends MY_Controller
     {
         if ($this->input->post()) {
             $this->form_validation->set_rules('name', 'Project Name', 'required');
-            $this->form_validation->set_rules('created_by', 'Created By', 'required');
             if ($this->form_validation->run()) {
-                $this->project->create($this->input->post());
+                $payload = [
+                    'name' => $this->input->post('name'),
+                    'created_by' => (int)$this->session->userdata('user_id')
+                ];
+                $this->project->create($payload);
                 redirect('projects');
             }
         }
@@ -47,10 +59,14 @@ class Projects extends MY_Controller
 
         if ($this->input->post()) {
             $this->form_validation->set_rules('name', 'Project Name', 'required');
-            $this->form_validation->set_rules('created_by', 'Created By', 'required');
             $this->form_validation->set_rules('status', 'Status', 'required');
             if ($this->form_validation->run()) {
-                $this->project->update($id, $this->input->post());
+                $payload = [
+                    'name' => $this->input->post('name'),
+                    'status' => $this->input->post('status'),
+                    'created_by' => $data['project']->created_by
+                ];
+                $this->project->update($id, $payload);
                 redirect('projects');
             }
         }
@@ -271,17 +287,67 @@ class Projects extends MY_Controller
                 
                 // Format dates if they are Excel date values
                 if (is_numeric($start_date)) {
-                    $start_date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($start_date)->format('Y-m-d');
+                    try {
+                        $dateObj = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($start_date);
+                        // Explicitly format as YYYY-MM-DD to avoid any ambiguity
+                        $start_date = $dateObj->format('Y') . '-' . 
+                                    str_pad($dateObj->format('m'), 2, '0', STR_PAD_LEFT) . '-' . 
+                                    str_pad($dateObj->format('d'), 2, '0', STR_PAD_LEFT);
+                    } catch (Exception $e) {
+                        $tasks_skipped++;
+                        continue;
+                    }
                 } else {
-                    $dt = DateTime::createFromFormat('d-m-Y', $start_date);
-                    if ($dt) { $start_date = $dt->format('Y-m-d'); }
+                    // Try multiple date formats
+                    $possibleFormats = ['d-m-Y', 'Y-m-d', 'd/m/Y', 'Y/m/d'];
+                    $validDate = false;
+                    foreach ($possibleFormats as $format) {
+                        $dt = DateTime::createFromFormat($format, $start_date);
+                        if ($dt && $dt->format($format) === $start_date) {
+                            // Explicitly format as YYYY-MM-DD
+                            $start_date = $dt->format('Y') . '-' . 
+                                        str_pad($dt->format('m'), 2, '0', STR_PAD_LEFT) . '-' . 
+                                        str_pad($dt->format('d'), 2, '0', STR_PAD_LEFT);
+                            $validDate = true;
+                            break;
+                        }
+                    }
+                    if (!$validDate) {
+                        $tasks_skipped++;
+                        continue;
+                    }
                 }
                 
                 if (is_numeric($expected_end_date)) {
-                    $expected_end_date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($expected_end_date)->format('Y-m-d');
+                    try {
+                        $dateObj = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($expected_end_date);
+                        // Explicitly format as YYYY-MM-DD to avoid any ambiguity
+                        $expected_end_date = $dateObj->format('Y') . '-' . 
+                                           str_pad($dateObj->format('m'), 2, '0', STR_PAD_LEFT) . '-' . 
+                                           str_pad($dateObj->format('d'), 2, '0', STR_PAD_LEFT);
+                    } catch (Exception $e) {
+                        $tasks_skipped++;
+                        continue;
+                    }
                 } else {
-                    $dtExp = DateTime::createFromFormat('d-m-Y', $expected_end_date);
-                    if ($dtExp) { $expected_end_date = $dtExp->format('Y-m-d'); }
+                    // Try multiple date formats
+                    $possibleFormats = ['d-m-Y', 'Y-m-d', 'd/m/Y', 'Y/m/d'];
+                    $validDate = false;
+                    foreach ($possibleFormats as $format) {
+                        $dtExp = DateTime::createFromFormat($format, $expected_end_date);
+                        if ($dtExp && $dtExp->format($format) === $expected_end_date) {
+                            // Explicitly format as YYYY-MM-DD
+                            $expected_end_date = $dtExp->format('Y') . '-' . 
+                                               str_pad($dtExp->format('m'), 2, '0', STR_PAD_LEFT) . '-' . 
+                                               str_pad($dtExp->format('d'), 2, '0', STR_PAD_LEFT);
+                            $validDate = true;
+                            break;
+                        }
+                    }
+                    if (!$validDate) {
+                        $tasks_skipped++;
+                        continue;
+                    }
                 }
                 
                 // Validate data
@@ -352,6 +418,14 @@ class Projects extends MY_Controller
             $this->form_validation->set_rules('status', 'Status', 'required');
 
             if ($this->form_validation->run()) {
+                // Get the start and end dates for the note
+                $note_start_date = new DateTime($this->input->post('start_date'));
+                $note_end_date = new DateTime($this->input->post('expected_end_date'));
+                
+                // Calculate the duration in days
+                $duration = $note_start_date->diff($note_end_date)->days;
+
+                // First create the note task
                 $payload = [
                     'project_id'          => $project_id,
                     'task_name'           => $this->input->post('task_name'),
@@ -366,6 +440,42 @@ class Projects extends MY_Controller
                 ];
 
                 $this->task->create($payload);
+
+                // Get all tasks for this project that start after the note's start date
+                $affected_tasks = $this->task->get_tasks_after_date($project_id, $this->input->post('start_date'));
+
+                // Update each affected task's dates
+                foreach ($affected_tasks as $task) {
+                    // Skip if it's the note task we just created
+                    if ($task->is_note_task == 1 && $task->start_date == $this->input->post('start_date')) {
+                        continue;
+                    }
+
+                    // Create DateTime objects for the task dates
+                    $task_start = new DateTime($task->start_date);
+                    $task_end = $task->expected_end_date ? new DateTime($task->expected_end_date) : null;
+                    $task_actual_end = $task->end_date ? new DateTime($task->end_date) : null;
+
+                    // Add the duration days to each date
+                    $task_start->add(new DateInterval("P{$duration}D"));
+                    if ($task_end) {
+                        $task_end->add(new DateInterval("P{$duration}D"));
+                    }
+                    if ($task_actual_end) {
+                        $task_actual_end->add(new DateInterval("P{$duration}D"));
+                    }
+
+                    // Update the task with new dates
+                    $update_payload = [
+                        'start_date' => $task_start->format('Y-m-d'),
+                        'expected_end_date' => $task_end ? $task_end->format('Y-m-d') : null,
+                        'end_date' => $task_actual_end ? $task_actual_end->format('Y-m-d') : null,
+                        'modified_at' => date('Y-m-d')
+                    ];
+
+                    $this->task->update($task->id, $update_payload);
+                }
+
                 redirect('projects/tasks/'.$project_id);
             }
         }
@@ -443,17 +553,67 @@ class Projects extends MY_Controller
 
                 // Format dates if they are Excel date values
                 if (is_numeric($start_date)) {
-                    $start_date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($start_date)->format('Y-m-d');
+                    try {
+                        $dateObj = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($start_date);
+                        // Explicitly format as YYYY-MM-DD to avoid any ambiguity
+                        $start_date = $dateObj->format('Y') . '-' . 
+                                    str_pad($dateObj->format('m'), 2, '0', STR_PAD_LEFT) . '-' . 
+                                    str_pad($dateObj->format('d'), 2, '0', STR_PAD_LEFT);
+                    } catch (Exception $e) {
+                        $tasks_skipped++;
+                        continue;
+                    }
                 } else {
-                    $dt = DateTime::createFromFormat('d-m-Y', $start_date);
-                    if ($dt) { $start_date = $dt->format('Y-m-d'); }
+                    // Try multiple date formats
+                    $possibleFormats = ['d-m-Y', 'Y-m-d', 'd/m/Y', 'Y/m/d'];
+                    $validDate = false;
+                    foreach ($possibleFormats as $format) {
+                        $dt = DateTime::createFromFormat($format, $start_date);
+                        if ($dt && $dt->format($format) === $start_date) {
+                            // Explicitly format as YYYY-MM-DD
+                            $start_date = $dt->format('Y') . '-' . 
+                                        str_pad($dt->format('m'), 2, '0', STR_PAD_LEFT) . '-' . 
+                                        str_pad($dt->format('d'), 2, '0', STR_PAD_LEFT);
+                            $validDate = true;
+                            break;
+                        }
+                    }
+                    if (!$validDate) {
+                        $tasks_skipped++;
+                        continue;
+                    }
                 }
 
                 if (is_numeric($expected_end_date)) {
-                    $expected_end_date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($expected_end_date)->format('Y-m-d');
+                    try {
+                        $dateObj = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($expected_end_date);
+                        // Explicitly format as YYYY-MM-DD to avoid any ambiguity
+                        $expected_end_date = $dateObj->format('Y') . '-' . 
+                                           str_pad($dateObj->format('m'), 2, '0', STR_PAD_LEFT) . '-' . 
+                                           str_pad($dateObj->format('d'), 2, '0', STR_PAD_LEFT);
+                    } catch (Exception $e) {
+                        $tasks_skipped++;
+                        continue;
+                    }
                 } else {
-                    $dtExp = DateTime::createFromFormat('d-m-Y', $expected_end_date);
-                    if ($dtExp) { $expected_end_date = $dtExp->format('Y-m-d'); }
+                    // Try multiple date formats
+                    $possibleFormats = ['d-m-Y', 'Y-m-d', 'd/m/Y', 'Y/m/d'];
+                    $validDate = false;
+                    foreach ($possibleFormats as $format) {
+                        $dtExp = DateTime::createFromFormat($format, $expected_end_date);
+                        if ($dtExp && $dtExp->format($format) === $expected_end_date) {
+                            // Explicitly format as YYYY-MM-DD
+                            $expected_end_date = $dtExp->format('Y') . '-' . 
+                                               str_pad($dtExp->format('m'), 2, '0', STR_PAD_LEFT) . '-' . 
+                                               str_pad($dtExp->format('d'), 2, '0', STR_PAD_LEFT);
+                            $validDate = true;
+                            break;
+                        }
+                    }
+                    if (!$validDate) {
+                        $tasks_skipped++;
+                        continue;
+                    }
                 }
 
                 // Validate data
@@ -544,5 +704,30 @@ class Projects extends MY_Controller
         $this->output
              ->set_content_type('application/json')
              ->set_output(json_encode(['url' => $shareUrl]));
+    }
+
+    public function get_current_share_link($project_id)
+    {
+        // Ensure the request is made via AJAX to avoid unintended direct hits
+        if (!$this->input->is_ajax_request()) {
+            show_404();
+            return;
+        }
+
+        $project = $this->project->get($project_id);
+        if (!$project) {
+            $this->output->set_status_header(404);
+            echo json_encode(['error' => 'Project not found']);
+            return;
+        }
+
+        $shareUrl = null;
+        if (!empty($project->share_token)) {
+            $shareUrl = site_url('share/' . $project->share_token);
+        }
+
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode(['url' => $shareUrl]));
     }
 } 

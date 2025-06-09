@@ -12,6 +12,9 @@
         -webkit-print-color-adjust: exact;
         color-adjust: exact;
     }
+    .gantt-wrapper {
+        scrollbar-width: none;
+    }
     #ganttChart {
         position: relative;
         transform-origin: top left;
@@ -87,7 +90,16 @@ $is_shared_view = $this->router->fetch_class() === 'share';
 
 
 <div class="input-group mb-3 mr-md-2 no-print">
-    <input type="text" id="ganttSearch" class="form-control" placeholder="Search tasks, assignees, status...">
+    <input type="text" id="ganttSearch" class="form-control col-md-3" placeholder="Search tasks, assignees, status...">
+    <div class="input-group-append ml-3">
+        <select id="statusFilter" class="form-control">
+            <option value="all" selected>All Tasks</option>
+            <option value="0">In Progress</option>
+            <option value="1">Completed</option>
+            <option value="2">Hold</option>
+            <option value="3">Discarded</option>
+        </select>
+    </div>
 </div>
 
 
@@ -107,7 +119,7 @@ $is_shared_view = $this->router->fetch_class() === 'share';
             <span class="legend-text">Weekend (Saturday/Sunday)</span>
         </div>
         <div class="legend-item">
-            <span class="color-box" style="background-color: #eed19a;"></span>
+            <span class="color-box" style="background-color: #f8d7da;"></span>
             <span class="legend-text">Change-Note Task</span>
         </div>
         <?php if (!$is_shared_view): ?>
@@ -310,7 +322,6 @@ $taskInfoWidth = $taskNameWidth + 910; // 60 (SrNo) + 150 (Assignee) + 100 (Dura
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    background: white;
 }
 
 .gantt-timeline-header {
@@ -586,13 +597,20 @@ $taskInfoWidth = $taskNameWidth + 910; // 60 (SrNo) + 150 (Assignee) + 100 (Dura
             
             $originalDurationDays = $taskEndDate->diff($taskStartDate)->days + 1;
         ?>
-            <div class="gantt-row" <?php if (isset($t->is_note_task) && $t->is_note_task == 1): ?>style="background-color: #eed19a;" <?php elseif ($t->status == 3): ?>style="background-color: #b1ff6e6e" <?php endif; ?>>
-                <div class="gantt-task-info-fixed">
+            <div class="gantt-row" 
+                <?php if (isset($t->is_note_task) && $t->is_note_task == 1): ?>
+                    style="background-color: #f8d7da;" 
+                <?php elseif ($t->status == 3): ?>
+                    style="background-color: #b1ff6e6e" 
+                <?php endif; ?>
+                data-status="<?= $t->status ?>"
+            >
+                <div class="gantt-task-info-fixed" style="background: <?php if (isset($t->is_note_task) && $t->is_note_task == 1): ?>#f8d7da <?php elseif ($t->status == 3): ?> #ddffc0 <?php endif; ?> !important;">
                     <div class="task-column task-sr-no"><?= $srNo++ ?></div>
                     <div class="task-column task-name" title="<?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?>"><?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?></div>
                     <div class="task-column task-assignee"><?= htmlspecialchars($t->assigned_to ?: 'N/A', ENT_QUOTES, 'UTF-8'); ?></div>
                 </div>
-                <div class="gantt-task-info-scrollable">
+                <div class="gantt-task-info-scrollable" style="background: <?php if (isset($t->is_note_task) && $t->is_note_task == 1): ?>#f8d7da <?php elseif ($t->status == 3): ?> #ddffc0 <?php endif; ?> !important;">
                     <div class="task-column task-duration"><?= $businessDays ?> (<?= $originalDurationDays ?>)</div>
                     <div class="task-column task-dates"><?= $t->start_date ?></div>
                     <div class="task-column task-dates"><?= $t->expected_end_date ?></div>
@@ -746,61 +764,67 @@ document.getElementById('exportPdf').addEventListener('click', function() {
 // Add search functionality
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('ganttSearch');
+    const statusFilter = document.getElementById('statusFilter');
     const ganttRows = document.querySelectorAll('.gantt-row');
     
-    // Improved scroll to current week functionality
-    function scrollToCurrentWeek() {
-        const ganttWrapper = document.querySelector('.gantt-wrapper');
-        const taskInfoFixed = document.querySelector('.gantt-task-info-fixed');
-        if (ganttWrapper && taskInfoFixed) {
-            const today = new Date();
-            const overallStartDate = new Date(document.getElementById('ganttChart').dataset.overallStart);
-            const dayWidth = parseFloat(document.getElementById('ganttChart').dataset.dayWidth);
+
+    // Function to filter rows based on both search and status
+    function filterRows() {
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const selectedStatus = statusFilter.value;
+        
+        ganttRows.forEach(function(row) {
+            const taskName = row.querySelector('.task-name').textContent.toLowerCase();
+            const assignee = row.querySelector('.task-assignee').textContent.toLowerCase();
+            const statusElement = row.querySelector('.task-column:nth-last-child(1)');
+            const statusText = statusElement.textContent.toLowerCase().trim();
             
-            // Calculate days between overall start and today
-            const diffTime = today.getTime() - overallStartDate.getTime();
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            // Check if row matches both search term and status filter
+            const matchesSearch = taskName.includes(searchTerm) || 
+                                assignee.includes(searchTerm) || 
+                                statusText.includes(searchTerm);
+                                
+            let matchesStatus = true;
+            if (selectedStatus !== 'all') {
+                // Get the status from the row's data attribute if it exists
+                const rowStatus = row.getAttribute('data-status') || statusText;
+                
+                // Map the dropdown values to the actual status text
+                const statusMap = {
+                    '0': ['in progress', '0'],
+                    '1': ['completed', '1'],
+                    '2': ['hold', '2'],
+                    '3': ['discarded', '3']
+                };
+                
+                // Check if the status matches either the text or the numeric value
+                matchesStatus = statusMap[selectedStatus].includes(rowStatus.toLowerCase());
+            }
             
-            // Calculate scroll position (center the current week)
-            // Account for fixed columns width and add offset
-            const fixedColumnsWidth = taskInfoFixed.offsetWidth;
-            const twoWeeksWidth = 70 * dayWidth; // Add two weeks worth of pixels
-            const scrollPosition = (diffDays * dayWidth) - ((ganttWrapper.offsetWidth - fixedColumnsWidth) / 2) + twoWeeksWidth;
-            
-            // Scroll to position with a slight delay to ensure rendering is complete
-            setTimeout(() => {
-                ganttWrapper.scrollLeft = Math.max(0, scrollPosition);
-            }, 100);
+            row.style.display = (matchesSearch && matchesStatus) ? '' : 'none';
+        });
+    }
+    
+    // Helper function to convert status text to numeric value
+    function getStatusValue(statusText) {
+        switch(statusText.toLowerCase().trim()) {
+            case 'in progress': return 0;
+            case 'completed': return 1;
+            case 'hold': return 2;
+            case 'discarded': return 3;
+            default: return -1;
         }
     }
     
-    // Call the function after a short delay to ensure all elements are rendered
-    setTimeout(scrollToCurrentWeek, 200);
+    // Add event listeners for both search and status filter
+    searchInput.addEventListener('keyup', filterRows);
+    statusFilter.addEventListener('change', filterRows);
     
-    searchInput.addEventListener('keyup', function() {
-        const searchTerm = this.value.toLowerCase().trim();
-        
-        ganttRows.forEach(function(row) {
-            // Extract searchable text from the row
-            const taskName = row.querySelector('.task-name').textContent.toLowerCase();
-            const assignee = row.querySelector('.task-assignee').textContent.toLowerCase();
-            const status = row.querySelector('.task-column:nth-last-child(1)').textContent.toLowerCase();
-            
-            // Check if any of the fields match the search term
-            if (taskName.includes(searchTerm) || 
-                assignee.includes(searchTerm) || 
-                status.includes(searchTerm)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
-    });
-    
-    // Clear search on escape key
+    // Clear search and reset filter on escape key
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && document.activeElement === searchInput) {
             searchInput.value = '';
+            statusFilter.value = 'all';
             ganttRows.forEach(function(row) {
                 row.style.display = '';
             });
@@ -812,40 +836,109 @@ document.addEventListener('DOMContentLoaded', function() {
     const title = document.querySelector("head > title")
     title.text = '<?= htmlspecialchars($project->name, ENT_QUOTES, 'UTF-8'); ?>'
     
-    /* Share link generation */
+    /* Share link generation & Modal Handling */
     const shareBtn = document.getElementById('generateShareLink');
-    if (shareBtn) {
-        shareBtn.addEventListener('click', function () {
-            // Disable button to prevent multiple clicks
-            shareBtn.disabled = true;
+    const shareLinkModal = $('#shareLinkModal'); // jQuery selector for Bootstrap modal
+    const shareableLinkInput = document.getElementById('shareableLinkInput');
+    const copyShareLinkBtn = document.getElementById('copyShareLink');
+    const regenerateShareLinkBtn = document.getElementById('regenerateShareLink');
+    const copyStatusMessage = document.getElementById('copyStatusMessage');
 
-            fetch('<?= site_url('projects/generate_share_link/'.$project->id); ?>', {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-                .then(response => response.json())
-                .then(data => {
-                    shareBtn.disabled = false;
-                    if (data.url) {
-                        // Try to copy to clipboard
-                        if (navigator.clipboard && window.isSecureContext) {
-                            navigator.clipboard.writeText(data.url)
-                                .then(() => alert('Share link copied to clipboard!\n' + data.url))
-                                .catch(() => window.prompt('Copy the share link:', data.url));
-                        } else {
-                            window.prompt('Copy the share link:', data.url);
-                        }
-                    } else if (data.error) {
-                        alert('Error: ' + data.error);
-                    }
-                })
-                .catch(() => {
-                    shareBtn.disabled = false;
-                    alert('An error occurred while generating the share link.');
-                });
+    function generateAndShowNewLink() {
+        if (shareBtn) shareBtn.disabled = true;
+        regenerateShareLinkBtn.disabled = true;
+
+        fetch('<?= site_url('projects/generate_share_link/'.$project->id); ?>', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (shareBtn) shareBtn.disabled = false;
+            regenerateShareLinkBtn.disabled = false;
+
+            if (data.url) {
+                shareableLinkInput.value = data.url;
+                copyStatusMessage.textContent = 'New link generated!';
+                setTimeout(() => { copyStatusMessage.textContent = ''; }, 2000);
+                if (!shareLinkModal.is(':visible')) {
+                    shareLinkModal.modal('show');
+                }
+            } else if (data.error) {
+                alert('Error generating new link: ' + data.error);
+            }
+        })
+        .catch(() => {
+            if (shareBtn) shareBtn.disabled = false;
+            regenerateShareLinkBtn.disabled = false;
+            alert('An error occurred while generating the new share link.');
         });
     }
 
+    function fetchAndDisplayLink() {
+        if (shareBtn) shareBtn.disabled = true;
+        regenerateShareLinkBtn.disabled = true; // Also disable regenerate button initially
+
+        fetch('<?= site_url('projects/get_current_share_link/'.$project->id); ?>', { // New endpoint
+            method: 'POST', // Should be GET if no CSRF, but POST for consistency with other AJAX calls
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (shareBtn) shareBtn.disabled = false;
+            regenerateShareLinkBtn.disabled = false;
+
+            if (data.url) { // Existing link found
+                shareableLinkInput.value = data.url;
+                copyStatusMessage.textContent = '';
+                shareLinkModal.modal('show');
+            } else if (data.hasOwnProperty('url') && data.url === null) { // No existing link, generate one
+                copyStatusMessage.textContent = 'No existing link found. Generating a new one...';
+                setTimeout(() => { copyStatusMessage.textContent = ''; }, 2000);
+                generateAndShowNewLink(); // Call the function to generate and show a new link
+            } else if (data.error) {
+                alert('Error fetching share link: ' + data.error);
+            }
+        })
+        .catch(() => {
+            if (shareBtn) shareBtn.disabled = false;
+            regenerateShareLinkBtn.disabled = false;
+            alert('An error occurred while fetching the share link.');
+        });
+    }
+
+    if (shareBtn) {
+        shareBtn.addEventListener('click', fetchAndDisplayLink);
+    }
+
+    if (regenerateShareLinkBtn) {
+        regenerateShareLinkBtn.addEventListener('click', generateAndShowNewLink); // Regenerate always makes a new one
+    }
+
+    if (copyShareLinkBtn) {
+        copyShareLinkBtn.addEventListener('click', function() {
+            shareableLinkInput.select(); // Select the text
+            shareableLinkInput.setSelectionRange(0, 99999); // For mobile devices
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(shareableLinkInput.value)
+                    .then(() => {
+                        copyStatusMessage.textContent = 'Link copied to clipboard!';
+                        setTimeout(() => { copyStatusMessage.textContent = ''; }, 2000);
+                    })
+                    .catch(() => {
+                        document.execCommand('copy'); // Fallback for older browsers
+                        copyStatusMessage.textContent = 'Link copied (fallback method)!';
+                        setTimeout(() => { copyStatusMessage.textContent = ''; }, 2000);
+                    });
+            } else {
+                document.execCommand('copy'); // Fallback for older browsers if clipboard API not available
+                copyStatusMessage.textContent = 'Link copied (fallback method)!';
+                setTimeout(() => { copyStatusMessage.textContent = ''; }, 2000);
+            }
+        });
+    }
+    
     // New tooltip functionality
     const tooltips = document.querySelectorAll('.tooltip');
     const tooltipTexts = document.querySelectorAll('.tooltiptext');
@@ -927,5 +1020,33 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<!-- Share Link Modal -->
+<div class="modal fade no-print" id="shareLinkModal" tabindex="-1" role="dialog" aria-labelledby="shareLinkModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="shareLinkModalLabel">Share Project Link</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Share this link to give read-only access to the Gantt chart:</p>
+                <div class="input-group mb-3">
+                    <input type="text" id="shareableLinkInput" class="form-control" readonly>
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="button" id="copyShareLink" title="Copy Link"><i class="fas fa-copy"></i></button>
+                    </div>
+                </div>
+                <p id="copyStatusMessage" class="small text-success"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-warning" id="regenerateShareLink"><i class="fas fa-sync-alt"></i> Regenerate Link</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php $this->load->view('layout/footer'); ?> 

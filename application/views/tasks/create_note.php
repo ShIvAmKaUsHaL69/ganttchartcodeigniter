@@ -23,10 +23,53 @@
                     <?= form_error('task_name', '<small class="text-danger">', '</small>'); ?>
                 </div>
             </div>
+            <style>
+                .select2-container .select2-selection--single {
+                    height: 36px !important;
+                }
+                .select2-container--default .select2-selection--single .select2-selection__rendered {
+                    line-height: 34px !important;
+                }
+            </style>    
             <div class="col-md-6">
                 <div class="form-group">
                     <label for="assigned_to">Assigned To</label>
-                    <input type="text" name="assigned_to" id="assigned_to" class="form-control" value="<?= set_value('assigned_to'); ?>">
+                    <select name="assigned_to" id="assigned_to" class="form-control select2">
+                        <option value="">Select User</option>
+                        <option value="Abhishek">Abhishek</option>
+                        <option value="Chirag">Chirag</option>
+                        <option value="Gautam">Gautam</option>
+                        <option value="Khushboo">Khushboo</option>
+                        <option value="Lovely">Lovely</option>
+                        <option value="Neeraj">Neeraj</option>
+                        <option value="Paltan">Paltan</option>
+                        <option value="Sahil">Sahil</option>
+                        <option value="Sudipto">Sudipto</option>
+                        <option value="Ajay">Ajay</option>
+                        <option value="Akshat">Akshat</option>
+                        <option value="Ashutosh">Ashutosh</option>
+                        <option value="Deepti">Deepti</option>
+                        <option value="Dhruv">Dhruv</option>
+                        <option value="Divish">Divish</option>
+                        <option value="Ganesh">Ganesh</option>
+                        <option value="Harsh">Harsh</option>
+                        <option value="Homan">Homan</option>
+                        <option value="Karan">Karan</option>
+                        <option value="Madhav">Madhav</option>
+                        <option value="Manu">Manu</option>
+                        <option value="Mehak">Mehak</option>
+                        <option value="Neeru">Neeru</option>
+                        <option value="Priyanshu">Priyanshu</option>
+                        <option value="Ravi">Ravi</option>
+                        <option value="Reshav">Reshav</option>
+                        <option value="Rupali">Rupali</option>
+                        <option value="Sameer">Sameer</option>
+                        <option value="Rupali">Rupali</option>
+                        <option value="Sanchit">Sanchit</option>
+                        <option value="Shivam">Shivam</option>
+                        <option value="Sandeep">Sandeep</option>
+                        <option value="Sarthak">Sarthak</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -108,4 +151,16 @@
     </form>
   </div>
 </div>
-<?php $this->load->view('layout/footer'); ?> 
+<?php $this->load->view('layout/footer'); ?>
+
+<!-- Initialize Select2 -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('.select2').select2({
+            placeholder: "Select User",
+            allowClear: true
+        });
+    });
+</script> 

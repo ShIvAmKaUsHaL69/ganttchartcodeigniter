@@ -14,7 +14,7 @@
     <span class="legend-text">Change-Note Task</span>
 </div>
 <div class="d-flex flex-wrap mb-3">
-    <div class="legend-item" style="background-color: #eed19a; width: 20px; height: 20px; border: 1px solid #ddd;"></div>
+    <div class="legend-item" style="background-color: #b1ff6e6e; width: 20px; height: 20px; border: 1px solid #ddd;"></div>
     <span style="width: 10px;"></span>
     <span class="legend-text">Discarded Task</span>
 </div>
@@ -42,7 +42,7 @@
         <?php
         $srno = 1;
         foreach ($tasks as $t): ?>
-            <tr <?= isset($t->is_note_task) && $t->is_note_task == 1 ? 'style="background-color: #f8d7da;"' : ($t->status == 3 ? 'style="background-color: #eed19a"' : ''); ?>>
+            <tr <?= isset($t->is_note_task) && $t->is_note_task == 1 ? 'style="background-color: #f8d7da;"' : ($t->status == 3 ? 'style="background-color: #b1ff6e6e"' : ''); ?>>
                 <td><?= $srno++; ?></td>
                 <td><?= htmlspecialchars($t->task_name, ENT_QUOTES, 'UTF-8'); ?></td>
                 <td><?= htmlspecialchars($t->assigned_to, ENT_QUOTES, 'UTF-8'); ?></td>
